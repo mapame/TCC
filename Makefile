@@ -1,0 +1,13 @@
+all: remote-control web-test
+
+bearssl:
+	make -C lib/bearssl lib
+
+remote-control: bearssl
+	gcc -Wall -o build/remote-control src/remote-control/main.c src/remote-control/tftp.c src/remote-control/gnuplot.c src/common/communication.c lib/bearssl/build/libbearssl.a -Isrc/common -Ilib/bearssl/inc -lbsd -lm
+
+data-export: bearssl
+	gcc -Wall -o build/data-export src/data-export/main.c src/common/communication.c lib/bearssl/build/libbearssl.a -Isrc/common -Ilib/bearssl/inc -lbsd -lm
+
+web-test: bearssl
+	gcc -Wall -o build/web-test src/web-test/main.c src/common/communication.c lib/bearssl/build/libbearssl.a lib/cJSON/cJSON.c -Isrc/common -Ilib/bearssl/inc -Ilib/cJSON -lbsd -lmicrohttpd -lm

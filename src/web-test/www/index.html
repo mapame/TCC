@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<script src="js/dygraph.min.js"></script>
+	<script src="js/webtest_script.js"></script>
+	
+	<link rel="stylesheet" href="css/siimple.min.css">
+	<link rel="stylesheet" href="css/dygraph.css">
+	<link rel="stylesheet" href="css/webtest_style.css">
+	<title>Web Test</title>
+</head>
+<body>
+	<div class="siimple-content siimple-content--large">
+		<div class="siimple-h1 siimple--text-center" id="data_time">00:00:00</div>
+		<div class="siimple-grid">
+			<div class="siimple-grid-row">
+				<div class="siimple-grid-col siimple-grid-col--4 siimple-grid-col--sm-6">
+					<div class="siimple-card">
+						<div class="siimple-card-header">A</div>
+						<div class="siimple-card-body" id="va">0.0 V</div>
+						<div class="siimple-card-body" id="ia">0.0 A</div>
+						<div class="siimple-card-body" id="pa">0.0 W</div>
+						<div class="siimple-card-body" id="sa">0.0 VA</div>
+						<div class="siimple-card-body" id="qa">0.0 VAr</div>
+						<div class="siimple-card-body" id="pfa">0.0</div>
+					</div>
+				</div>
+				<div class="siimple-grid-col siimple-grid-col--4 siimple-grid-col--sm-6">
+					<div class="siimple-card">
+						<div class="siimple-card-header">B</div>
+						<div class="siimple-card-body" id="vb">0.0 V</div>
+						<div class="siimple-card-body" id="ib">0.0 A</div>
+						<div class="siimple-card-body" id="pb">0.0 W</div>
+						<div class="siimple-card-body" id="sb">0.0 VA</div>
+						<div class="siimple-card-body" id="qb">0.0 VAr</div>
+						<div class="siimple-card-body" id="pfb">0.0</div>
+					</div>
+				</div>
+				<div class="siimple-grid-col siimple-grid-col--4 siimple-grid-col--sm-12">
+					<div class="siimple-card">
+						<div class="siimple-card-header">Total</div>
+						<div class="siimple-card-body">&nbsp;</div>
+						<div class="siimple-card-body">&nbsp;</div>
+						<div class="siimple-card-body" id="pt">0.0 W</div>
+						<div class="siimple-card-body" id="st">0.0 VA</div>
+						<div class="siimple-card-body" id="qt">0.0 VAr</div>
+						<div class="siimple-card-body" id="pft">&nbsp;</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	<div class="siimple-content siimple-content--large">
+		<div style="width: 100%;" id="total_power_chart_div"></div>
+	</div>
+	<div class="siimple-content siimple-content--large">
+		<div class="siimple-grid">
+			<div class="siimple-grid-row">
+				<div class="siimple-grid-col siimple-grid-col--6 siimple-grid-col--sm-12" style="min-height: 240px;" id="chart2Adiv"></div>
+				<div class="siimple-grid-col siimple-grid-col--6 siimple-grid-col--sm-12" style="min-height: 240px;" id="chart2Bdiv"></div>
+			</div>
+		</div>
+	</div>
+	<div class="siimple-content siimple-content--large">
+		<div style="width: 100%;" id="voltage_chart_div"></div>
+	</div>
+</body>
+</html>
