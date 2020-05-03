@@ -14,16 +14,9 @@
 #include "bearssl.h"
 
 #include "communication.h"
+#include "logger.h"
 
-#define DEBUG
-
-#ifdef DEBUG
-#define debug(fmt, ...) printf(fmt, ## __VA_ARGS__)
-#else
-#define debug(fmt, ...)
-#endif
-
-char opcode_text[OPCODE_NUM][3] = {
+static const char opcode_text[OPCODE_NUM][3] = {
 	"HE",
 	"SS",
 	"SP",
@@ -38,11 +31,31 @@ char opcode_text[OPCODE_NUM][3] = {
 	"BY"
 };
 
+
+static const char comm_status_text_invalid[] = "Invalid status";
+static const char comm_status_text[COMM_STATUS_NUM][32] = {
+	"COMM_OK",
+	"COMM_ERR_SENDING_COMMAND",
+	"COMM_ERR_RECEVING_RESPONSE",
+	"COMM_ERR_INVALID_MAC",
+	"COMM_ERR_WRONG_RESPONSE",
+	"COMM_ERR_PARSING_RESPONSE",
+	"COMM_ERR_RESPONSE_CODE"
+};
+
+
 static int convert_opcode(char *buf);
 static void compute_hmac(const br_hmac_key_context *hmac_key_ctx, char *output_mac_text, const char *data, size_t len);
 static int validate_hmac(const br_hmac_key_context *hmac_key_ctx, char *data, size_t len);
 static int recv_command_line(int socket_fd, char *buf, size_t len);
 int parse_parameters(char *parameter_buffer, char parsed_parameters[][PARAM_STR_SIZE], unsigned int parameter_qty);
+
+const char * get_comm_status_text(comm_status_t status) {
+	if(status >= COMM_STATUS_NUM)
+		return comm_status_text_invalid;
+	
+	return comm_status_text[status];
+}
 
 int send_comand_and_receive_response(int socket_fd, const br_hmac_key_context *hmac_key_ctx, int op, unsigned int counter, const char *command_parameters, char response_parameters[][PARAM_STR_SIZE], unsigned int expected_parameter_qty) {
 	time_t timestamp;
@@ -68,7 +81,7 @@ int receive_response(int socket_fd, const br_hmac_key_context *hmac_key_ctx, int
 	if(received_line_len <= 0) // Timeout or disconnection
 		return COMM_ERR_RECEVING_RESPONSE;
 	
-	//debug("Recv: %s\n", receive_buffer);
+	LOG_TRACE("Recv: %s\n", receive_buffer);
 	
 	if(validate_hmac(hmac_key_ctx, receive_buffer, received_line_len))
 		return COMM_ERR_INVALID_MAC;
@@ -163,10 +176,8 @@ int parse_response(char *receive_buffer, int op, time_t timestamp, unsigned int 
 	if(sscanf(token, "%d", &received_code) != 1)
 		return COMM_ERR_PARSING_RESPONSE;
 	
-	#ifdef DEBUG
-		if(received_code)
-			debug("Received response with error code %d.\n", received_code);
-	#endif
+	if(received_code)
+		LOG_DEBUG("Received response with error code %d.\n", received_code);
 	
 	if(response_code)
 		*response_code = received_code;
@@ -266,11 +277,11 @@ static int validate_hmac(const br_hmac_key_context *hmac_key_ctx, char *data, si
 	if(strlen(received_mac_text) != 32)
 		return -1;
 	
-	//debug("Received HMAC:   %s\n", received_mac_text);
+	LOG_TRACE("Received HMAC:   %s\n", received_mac_text);
 	
 	compute_hmac(hmac_key_ctx, computed_mac_text, data, len - 33);
 	
-	//debug("Calculated HMAC: %s\n", computed_mac_text);
+	LOG_TRACE("Calculated HMAC: %s\n", computed_mac_text);
 	
 	if(strcmp(received_mac_text, computed_mac_text)) // Protocol error - Invalid MAC
 		return -2;

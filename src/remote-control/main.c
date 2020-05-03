@@ -15,6 +15,7 @@
 #include "bearssl.h"
 
 #include "common.h"
+#include "logger.h"
 #include "communication.h"
 #include "tftp.h"
 #include "gnuplot.h"
@@ -204,6 +205,8 @@ int main(int argc, char **argv) {
 	struct sockaddr_in server_bind_address;
 	
 	FILE *fw_fd = NULL;
+	
+	logger_init(stderr, LOGLEVEL_INFO);
 	
 	if(argc < 4 || (action = convert_action(argv[3])) < 0 || (argc - 4) != action_metadata_list[action].parameter_qty) {
 		printf("Usage: %s device_id mac_password action [action_parameters]\n\n", argv[0]);

@@ -16,6 +16,7 @@
 #include "bearssl.h"
 
 #include "common.h"
+#include "logger.h"
 #include "communication.h"
 
 #define COMM_SERVER_PORT 2048
@@ -60,6 +61,8 @@ int main(int argc, char **argv) {
 	int main_socket;
 	struct sockaddr_in server_bind_address;
 	
+	logger_init(stderr, LOGLEVEL_INFO);
+	
 	while ((opt = getopt(argc, argv, "r")) != -1) {
 		switch (opt) {
 			case 'r':
@@ -80,7 +83,7 @@ int main(int argc, char **argv) {
 	output_fd = fopen(output_filename, "a");
 	
 	if(!output_fd) {
-		fprintf(stderr, "Unable to open file %s.\n", output_filename);
+		LOG_FATAL("Unable to open file %s.", output_filename);
 		return -1;
 	}
 	
@@ -92,7 +95,7 @@ int main(int argc, char **argv) {
 	
 	main_socket = socket(PF_INET, SOCK_STREAM, 0);
 	if(main_socket < 0) {
-		fprintf(stderr, "Unable to create main socket.\n");
+		LOG_FATAL("Unable to create main socket.");
 		return -1;
 	}
 	
@@ -105,16 +108,16 @@ int main(int argc, char **argv) {
 	server_bind_address.sin_port        = htons(COMM_SERVER_PORT);
 	
 	if(bind(main_socket, (struct sockaddr *) &server_bind_address, sizeof(server_bind_address)) < 0) {
-		fprintf(stderr, "Unable to bind main socket.\n");
+		LOG_FATAL("Unable to bind main socket.");
 		return -1;
 	}
 	
 	if(listen(main_socket, 2) < 0) {
-		fprintf(stderr, "Unable to put main socket in listening mode.\n");
+		LOG_FATAL("Unable to put main socket in listening mode.");
 		return -1;
 	}
 	
-	printf("Waiting for device connection on port %d...\n", COMM_SERVER_PORT);
+	LOG_INFO("Waiting for device connection on port %d...", COMM_SERVER_PORT);
 	fflush(stdin);
 	
 	int client_socket;
@@ -141,21 +144,21 @@ int main(int argc, char **argv) {
 		while(!terminate) {
 			client_socket = accept(main_socket, (struct sockaddr *) &client_address, &client_address_size);
 			if(client_socket < 0) {
-				fprintf(stderr, "Unable to accept connection.\n");
+				LOG_ERROR("Unable to accept connection.");
 				continue;
 			}
 			
-			printf("Received connection from %s\n", inet_ntoa(client_address.sin_addr));
+			LOG_INFO("Received connection from %s", inet_ntoa(client_address.sin_addr));
 			fflush(stdin);
 			
 			struct timeval socket_timeout_value = {.tv_sec = 2, .tv_usec = 0};
 			if(setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&socket_timeout_value, sizeof(socket_timeout_value)) < 0)
-				fprintf(stderr, "Unable to set socket timeout value.\n");
+				LOG_ERROR("Unable to set socket timeout value.");
 			
 			counter = 0;
 			
 			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_PROTOCOL_START, counter++, NULL, received_parameters, 3))) {
-				fprintf(stderr, "Error sending OP_PROTOCOL_START command. (%d)\n", command_result);
+				LOG_ERROR("Error sending OP_PROTOCOL_START command. (%s)", get_comm_status_text(command_result));
 				close(client_socket);
 				continue;
 			}
@@ -166,22 +169,24 @@ int main(int argc, char **argv) {
 			send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_DISCONNECT, counter++, "2000\t", NULL, 0);
 			shutdown(client_socket, SHUT_RDWR);
 			close(client_socket);
-			printf("Wrong device, disconneting...\n");
+			LOG_INFO("Wrong device, disconneting...");
 		}
 		
-		printf("Device type: %s\n", received_parameters[0]);
-		printf("Device firmware version: %s\n\n", received_parameters[2]);
+		if(!terminate) {
+			LOG_INFO("Device type: %s", received_parameters[0]);
+			LOG_INFO("Device firmware version: %s", received_parameters[2]);
+		}
 		
 		while(!terminate) {
 			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_QUERY_STATUS, counter++, NULL, received_parameters, 11))) {
-				fprintf(stderr, "Error sending OP_QUERY_STATUS command. (%d)\n", command_result);
+				LOG_ERROR("Error sending OP_QUERY_STATUS command. (%s)", get_comm_status_text(command_result));
 				close(client_socket);
 				break;
 			}
 			
 			if(*received_parameters[0] == '0') {
 				if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_SAMPLING_START, counter++, NULL, NULL, 0))) {
-					fprintf(stderr, "Error sending OP_SAMPLING_START command. (%d)\n", command_result);
+					LOG_ERROR("Error sending OP_SAMPLING_START command. (%s)", get_comm_status_text(command_result));
 					close(client_socket);
 				}
 			}
@@ -194,14 +199,14 @@ int main(int argc, char **argv) {
 			sprintf(aux, "pd\tr\t%u\t", qty);
 			
 			if((command_result = send_command(client_socket, &hmac_key_ctx, OP_GET_DATA, &aux_timestamp, counter, aux))) {
-				fprintf(stderr, "Error sending OP_GET_DATA command. (%d)\n", command_result);
+				LOG_ERROR("Error sending OP_GET_DATA command. (%s)", get_comm_status_text(command_result));
 				close(client_socket);
 				break;
 			}
 			
 			for(int i = 0; i < qty; i++) {
 				if((command_result = receive_response(client_socket, &hmac_key_ctx, OP_GET_DATA, aux_timestamp, counter, NULL, received_parameters, 12))) {
-					fprintf(stderr, "Error receiving OP_GET_DATA response. (%d)\n", command_result);
+					LOG_ERROR("Error receiving OP_GET_DATA response. (%s)", get_comm_status_text(command_result));
 					close(client_socket);
 					break;
 				}
@@ -247,7 +252,7 @@ int main(int argc, char **argv) {
 			counter++;
 			
 			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_DELETE_DATA, counter++, aux, NULL, 0))) {
-				fprintf(stderr, "Error sending OP_DELETE_DATA command. (%d)\n", command_result);
+				LOG_ERROR("Error sending OP_DELETE_DATA command. (%s)", get_comm_status_text(command_result));
 				close(client_socket);
 				break;
 			}
@@ -261,10 +266,10 @@ int main(int argc, char **argv) {
 	fclose(output_fd);
 	
 	if(terminate) {
-		printf("Terminating...\n");
+		LOG_INFO("Terminating...");
 		
 		if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_DISCONNECT, counter++, "1000\t", NULL, 0)))
-			fprintf(stderr, "Error sending OP_DISCONNECT command. (%d)\n", command_result);
+			LOG_ERROR("Error sending OP_DISCONNECT command. (%s)", get_comm_status_text(command_result));
 		
 		shutdown(client_socket, SHUT_RDWR);
 		close(client_socket);
