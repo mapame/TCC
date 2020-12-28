@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 #include <pthread.h>
 
@@ -28,6 +29,16 @@ void logger_init(FILE *fd, loglevel_t level) {
 	loglevel = level;
 	
 	pthread_mutex_init(&log_mutex, NULL);
+}
+
+void logger_set_level(loglevel_t level) {
+	loglevel = level;
+}
+
+void logger_set_level_by_name(const char* level_name) {
+	for(loglevel_t level = LOGLEVEL_TRACE; level <= LOGLEVEL_FATAL; level++)
+		if(!strcmp(level_names[level], level_name))
+			loglevel = level;
 }
 
 void logger_log(loglevel_t level, const char* file, int line, const char* fmt, ...) {
