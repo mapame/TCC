@@ -305,7 +305,7 @@ int main(int argc, char **argv) {
 			return -1;
 		}
 		
-		if(strcmp(received_parameters[1], argv[1]) == 0)
+		if(strcmp(received_parameters[0], argv[1]) == 0)
 			break;
 		
 		send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_DISCONNECT, counter++, "2000\t", NULL, 0);
@@ -314,8 +314,7 @@ int main(int argc, char **argv) {
 		printf("Wrong device, disconneting...\n");
 	}
 	
-	printf("Device type: %s\n", received_parameters[0]);
-	printf("Device firmware version: %s\n\n", received_parameters[2]);
+	printf("Device firmware version: %s\n\n", received_parameters[1]);
 	
 	switch(action) {
 		case ACT_START_SAMPLING:

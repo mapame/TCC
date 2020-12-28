@@ -251,7 +251,7 @@ int main(int argc, char **argv) {
 				continue;
 			}
 			
-			if(strcmp(received_parameters[1], device_id) == 0)
+			if(strcmp(received_parameters[0], device_id) == 0)
 				break;
 			
 			send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_DISCONNECT, counter++, "2000\t", NULL, 0);
@@ -261,8 +261,7 @@ int main(int argc, char **argv) {
 		}
 		
 		if(!terminate) {
-			LOG_INFO("Device type: %s", received_parameters[0]);
-			LOG_INFO("Device firmware version: %s", received_parameters[2]);
+			LOG_INFO("Device firmware version: %s", received_parameters[1]);
 		}
 		
 		while(!terminate) {
