@@ -51,7 +51,7 @@ void sigint_handler(int signum) {
 	terminate = 1;
 }
 
-static int ahc(void * cls, struct MHD_Connection * connection, const char * url, const char * method, const char * version, const char * upload_data, size_t * upload_data_size, void ** ptr) {
+static enum MHD_Result ahc(void * cls, struct MHD_Connection * connection, const char * url, const char * method, const char * version, const char * upload_data, size_t * upload_data_size, void ** ptr) {
 	static int dummy;
 	const char *aux;
 	time_t req_timestamp = 0;
@@ -245,7 +245,7 @@ int main(int argc, char **argv) {
 			
 			counter = 0;
 			
-			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_PROTOCOL_START, counter++, NULL, received_parameters, 3))) {
+			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_PROTOCOL_START, counter++, NULL, received_parameters, 2))) {
 				LOG_ERROR("Error sending OP_PROTOCOL_START command. (%s)", get_comm_status_text(command_result));
 				close(client_socket);
 				continue;
@@ -265,7 +265,7 @@ int main(int argc, char **argv) {
 		}
 		
 		while(!terminate) {
-			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_QUERY_STATUS, counter++, NULL, received_parameters, 11))) {
+			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_QUERY_STATUS, counter++, NULL, received_parameters, 4))) {
 				LOG_ERROR("Error sending OP_QUERY_STATUS command. (%s)", get_comm_status_text(command_result));
 				close(client_socket);
 				break;
@@ -278,12 +278,12 @@ int main(int argc, char **argv) {
 				}
 			}
 			
-			sscanf(received_parameters[7], "%u", &qty);
+			sscanf(received_parameters[3], "%u", &qty);
 			
 			if(qty == 0)
 				continue;
 			
-			sprintf(aux, "pd\tr\t%u\t", qty);
+			sprintf(aux, "P\t%u\t", qty);
 			
 			if((command_result = send_command(client_socket, &hmac_key_ctx, OP_GET_DATA, &aux_timestamp, counter, aux))) {
 				LOG_ERROR("Error sending OP_GET_DATA command. (%s)", get_comm_status_text(command_result));

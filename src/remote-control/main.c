@@ -15,7 +15,6 @@
 #include "bearssl.h"
 
 #include "common.h"
-#include "logger.h"
 #include "communication.h"
 #include "tftp.h"
 #include "gnuplot.h"
@@ -41,16 +40,6 @@ typedef enum {
 	ACTION_NUM
 } protocol_opcodes_t;
 
-typedef enum {
-	DATA_TYPE_INTERNAL_EVENT,
-	DATA_TYPE_INTERNAL_EVENT_FLASH,
-	DATA_TYPE_POWER_EVENT,
-	DATA_TYPE_POWER_EVENT_FLASH,
-	DATA_TYPE_POWER_DATA,
-	DATA_TYPE_POWER_DATA_FLASH,
-	DATA_TYPE_QTY
-} data_types_t;
-
 
 typedef struct action_metadata_s {
 	char action_text[32];
@@ -65,12 +54,10 @@ action_metadata_t action_metadata_list[ACTION_NUM] = {
 	{"restart",				0},
 	{"fw_update",			1},
 	{"status",				0},
-	{"get_data",			3},
+	{"get_data",			2},
 	{"plot_waveform",		2}
 };
 
-unsigned int data_type_status_index[DATA_TYPE_QTY] = {5, 8, 6, 9, 7, 10};
-unsigned int data_type_response_parameter_qty[DATA_TYPE_QTY] = {4, 4, 6, 6, 12, 8};
 
 int convert_action(char *buf) {
 	if(!buf)
@@ -206,8 +193,6 @@ int main(int argc, char **argv) {
 	
 	FILE *fw_fd = NULL;
 	
-	logger_init(stderr, LOGLEVEL_INFO);
-	
 	if(argc < 4 || (action = convert_action(argv[3])) < 0 || (argc - 4) != action_metadata_list[action].parameter_qty) {
 		printf("Usage: %s device_id mac_password action [action_parameters]\n\n", argv[0]);
 		printf("Actions:\n");
@@ -218,7 +203,7 @@ int main(int argc, char **argv) {
 		printf("\t restart\n");
 		printf("\t fw_update filename\n");
 		printf("\t status\n");
-		printf("\t get_data type source quantity\n");
+		printf("\t get_data type quantity\n");
 		printf("\t plot_waveform channel samples\n");
 		return -1;
 	}
@@ -274,7 +259,7 @@ int main(int argc, char **argv) {
 	unsigned int status_qty;
 	unsigned int aux_channel;
 	
-	int aux_data_type;
+	int is_event;
 	int command_result;
 	char aux[200];
 	char received_parameters[PARAM_MAX_QTY][PARAM_STR_SIZE];
@@ -299,7 +284,7 @@ int main(int argc, char **argv) {
 		
 		counter = 0;
 		
-		if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_PROTOCOL_START, counter++, NULL, received_parameters, 3))) {
+		if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_PROTOCOL_START, counter++, NULL, received_parameters, 2))) {
 			fprintf(stderr, "Error sending OP_PROTOCOL_START command. (%d)\n", command_result);
 			close(client_socket);
 			return -1;
@@ -377,59 +362,48 @@ int main(int argc, char **argv) {
 			action_fw_update(client_socket, &hmac_key_ctx, &counter, fw_fd);
 			break;
 		case ACT_READ_STATUS:
-			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_QUERY_STATUS, counter++, NULL, received_parameters, 11))) {
+			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_QUERY_STATUS, counter++, NULL, received_parameters, 4))) {
 				fprintf(stderr, "Error sending OP_QUERY_STATUS command. (%d)\n", command_result);
 				close(client_socket);
 				break;
 			}
 			
-			sscanf(received_parameters[1], "%u", &uptime);
-			sscanf(received_parameters[3], "%ld", &aux_time);
+			//sscanf(received_parameters[1], "%u", &uptime);
+			//printf("Uptime: %uh %02um %02us\n", uptime / 3600, (uptime % 3600) / 60, uptime % 60);
+			//printf("Temperature: %s C\n", received_parameters[2]);
+			
+			sscanf(received_parameters[1], "%ld", &aux_time);
 			
 			printf("Sampling state: %s (%s)\n", (received_parameters[0][0] == '0') ? "PAUSED" : "RUNNING", received_parameters[0]);
-			printf("Uptime: %uh %02um %02us\n", uptime / 3600, (uptime % 3600) / 60, uptime % 60);
-			printf("Temperature: %s C\n", received_parameters[2]);
-			printf("RTC time: %s = %s", received_parameters[3], ctime(&aux_time));
-			printf("RTC oscillator stop count: %s\n", received_parameters[4]);
-			printf("RAM:\n");
-			printf("  Internal events: %s\n", received_parameters[5]);
-			printf("  Power events: %s\n", received_parameters[6]);
-			printf("  Power data: %s\n", received_parameters[7]);
-			printf("Flash:\n");
-			printf("  Internal events: %s\n", received_parameters[8]);
-			printf("  Power events: %s\n", received_parameters[9]);
-			printf("  Power data: %s\n", received_parameters[10]);
+			printf("RTC time: %s = %s", received_parameters[1], ctime(&aux_time));
+			printf("Event count: %s\n", received_parameters[2]);
+			printf("Power data count: %s\n", received_parameters[3]);
 			
 			break;
 		case ACT_GET_DATA:
-			if(!strcmp(argv[6], "all")) {
+			if(!strcmp(argv[5], "all")) {
 					aux_qty = 10000;
-			} else if(sscanf(argv[6], "%u", &aux_qty) != 1) {
+			} else if(sscanf(argv[5], "%u", &aux_qty) != 1) {
 				fprintf(stderr, "Invalid quantity argument.\n");
 				break;
 			}
 			
-			if(!strcmp(argv[4], "ie")) {
-				aux_data_type = DATA_TYPE_INTERNAL_EVENT;
-			} else if(!strcmp(argv[4], "pe")) {
-				aux_data_type = DATA_TYPE_POWER_EVENT;
-			} else if(!strcmp(argv[4], "pd")) {
-				aux_data_type = DATA_TYPE_POWER_DATA;
+			if(!strcmp(argv[4], "event")) {
+				is_event = 1;
+			} else if(!strcmp(argv[4], "power")) {
+				is_event = 0;
 			} else {
-				fprintf(stderr, "Invalid type argument.\n");
+				fprintf(stderr, "Invalid type, must be \"power\" or \"event\".\n");
 				break;
 			}
 			
-			if(*argv[5] == 'f')
-				aux_data_type++;
-			
-			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_QUERY_STATUS, counter++, NULL, received_parameters, 11))) {
+			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_QUERY_STATUS, counter++, NULL, received_parameters, 4))) {
 				fprintf(stderr, "Error sending OP_QUERY_STATUS command. (%d)\n", command_result);
 				close(client_socket);
 				break;
 			}
 			
-			sscanf(received_parameters[data_type_status_index[aux_data_type]], "%u", &status_qty);
+			sscanf(received_parameters[(is_event ? 2 : 3)], "%u", &status_qty);
 			
 			aux_qty = MIN(aux_qty, status_qty);
 			
@@ -438,7 +412,7 @@ int main(int argc, char **argv) {
 				break;
 			}
 			
-			sprintf(aux, "%s\t%s\t%u\t", argv[4], argv[5], aux_qty);
+			sprintf(aux, "%c\t%u\t", (is_event ? 'E' : 'P'), aux_qty);
 			if((command_result = send_command(client_socket, &hmac_key_ctx, OP_GET_DATA, &aux_timestamp, counter, aux))) {
 				fprintf(stderr, "Error sending OP_GET_DATA command. (%d)\n", command_result);
 				close(client_socket);
@@ -446,7 +420,7 @@ int main(int argc, char **argv) {
 			}
 			
 			for(int i = 0; i < aux_qty; i++) {
-				if((command_result = receive_response(client_socket, &hmac_key_ctx, OP_GET_DATA, aux_timestamp, counter, NULL, received_parameters, data_type_response_parameter_qty[aux_data_type]))) {
+				if((command_result = receive_response(client_socket, &hmac_key_ctx, OP_GET_DATA, aux_timestamp, counter, NULL, received_parameters, (is_event ? 4 : 12)))) {
 					fprintf(stderr, "Error receiving OP_GET_DATA response. (%d)\n", command_result);
 					close(client_socket);
 					break;
@@ -457,21 +431,10 @@ int main(int argc, char **argv) {
 				printf("--------------------------------------------------------------------------\n");
 				printf("Timestamp: %s = %s", received_parameters[0], ctime(&aux_time));
 				
-				if(aux_data_type == DATA_TYPE_POWER_DATA) {
+				if(is_event == 0) {
 					printf("Samples: %s\n", received_parameters[1]);
 					printf("Duration: %s us\n", received_parameters[2]);
 					print_power_data(received_parameters[3], received_parameters[4], received_parameters[5], received_parameters[6], received_parameters[7], received_parameters[8], received_parameters[9], received_parameters[10], received_parameters[11]);
-				} else if(aux_data_type == DATA_TYPE_POWER_DATA_FLASH) {
-					printf("Seconds: %s\n", received_parameters[1]);
-					printf("A: %s Wh | %s VArh\n", received_parameters[2], received_parameters[5]);
-					printf("B: %s Wh | %s VArh\n", received_parameters[3], received_parameters[6]);
-					printf("C: %s Wh | %s VArh\n", received_parameters[4], received_parameters[7]);
-				} else if(aux_data_type == DATA_TYPE_POWER_EVENT || aux_data_type == DATA_TYPE_POWER_EVENT_FLASH) {
-					printf("Type: %s\n", received_parameters[1]);
-					printf("Count: %s\n", received_parameters[2]);
-					printf("Channel: %s\n", received_parameters[3]);
-					printf("Average Value: %s\n", received_parameters[4]);
-					printf("Worst Value: %s\n", received_parameters[5]);
 				} else {
 					printf("Type: %s\n", received_parameters[1]);
 					printf("Count: %s\n", received_parameters[2]);

@@ -21,8 +21,6 @@
 
 #define COMM_SERVER_PORT 2048
 
-#define POWER_DATA_BUFFER_SIZE 200
-
 
 typedef struct power_data_s {
 	time_t timestamp;
@@ -157,7 +155,7 @@ int main(int argc, char **argv) {
 			
 			counter = 0;
 			
-			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_PROTOCOL_START, counter++, NULL, received_parameters, 3))) {
+			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_PROTOCOL_START, counter++, NULL, received_parameters, 2))) {
 				LOG_ERROR("Error sending OP_PROTOCOL_START command. (%s)", get_comm_status_text(command_result));
 				close(client_socket);
 				continue;
@@ -177,7 +175,7 @@ int main(int argc, char **argv) {
 		}
 		
 		while(!terminate) {
-			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_QUERY_STATUS, counter++, NULL, received_parameters, 11))) {
+			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_QUERY_STATUS, counter++, NULL, received_parameters, 4))) {
 				LOG_ERROR("Error sending OP_QUERY_STATUS command. (%s)", get_comm_status_text(command_result));
 				close(client_socket);
 				break;
@@ -190,12 +188,12 @@ int main(int argc, char **argv) {
 				}
 			}
 			
-			sscanf(received_parameters[7], "%u", &qty);
+			sscanf(received_parameters[3], "%u", &qty);
 			
 			if(qty == 0)
 				continue;
 			
-			sprintf(aux, "pd\tr\t%u\t", qty);
+			sprintf(aux, "P\t%u\t", qty);
 			
 			if((command_result = send_command(client_socket, &hmac_key_ctx, OP_GET_DATA, &aux_timestamp, counter, aux))) {
 				LOG_ERROR("Error sending OP_GET_DATA command. (%s)", get_comm_status_text(command_result));
