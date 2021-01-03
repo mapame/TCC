@@ -35,6 +35,7 @@ typedef enum {
 	ACT_RESTART_DEVICE,
 	ACT_FW_UPDATE,
 	ACT_READ_STATUS,
+	ACT_READ_ADV_STATUS,
 	ACT_GET_DATA,
 	ACT_PLOT_WAVEFORM,
 	ACTION_NUM
@@ -54,6 +55,7 @@ action_metadata_t action_metadata_list[ACTION_NUM] = {
 	{"restart",				0},
 	{"fw_update",			1},
 	{"status",				0},
+	{"status_adv",			0},
 	{"get_data",			2},
 	{"plot_waveform",		2}
 };
@@ -362,15 +364,11 @@ int main(int argc, char **argv) {
 			action_fw_update(client_socket, &hmac_key_ctx, &counter, fw_fd);
 			break;
 		case ACT_READ_STATUS:
-			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_QUERY_STATUS, counter++, NULL, received_parameters, 4))) {
+			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_QUERY_STATUS, counter++, "A\t", received_parameters, 4))) {
 				fprintf(stderr, "Error sending OP_QUERY_STATUS command. (%d)\n", command_result);
 				close(client_socket);
 				break;
 			}
-			
-			//sscanf(received_parameters[1], "%u", &uptime);
-			//printf("Uptime: %uh %02um %02us\n", uptime / 3600, (uptime % 3600) / 60, uptime % 60);
-			//printf("Temperature: %s C\n", received_parameters[2]);
 			
 			sscanf(received_parameters[1], "%ld", &aux_time);
 			
@@ -378,6 +376,20 @@ int main(int argc, char **argv) {
 			printf("RTC time: %s = %s", received_parameters[1], ctime(&aux_time));
 			printf("Event count: %s\n", received_parameters[2]);
 			printf("Power data count: %s\n", received_parameters[3]);
+			
+			break;
+		case ACT_READ_ADV_STATUS:
+			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_QUERY_STATUS, counter++, "B\t", received_parameters, 3))) {
+				fprintf(stderr, "Error sending OP_QUERY_STATUS command. (%d)\n", command_result);
+				close(client_socket);
+				break;
+			}
+			
+			sscanf(received_parameters[0], "%u", &uptime);
+			
+			printf("Uptime: %uh %02um %02us\n", uptime / 3600, (uptime % 3600) / 60, uptime % 60);
+			printf("Free Heap: %s bytes\n", received_parameters[1]);
+			printf("Temperature: %s C\n", received_parameters[2]);
 			
 			break;
 		case ACT_GET_DATA:
