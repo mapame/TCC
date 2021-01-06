@@ -21,6 +21,8 @@
 
 #define COMM_SERVER_PORT 2048
 
+#define WAVEFORM_MAX_QTY 100
+
 
 typedef struct power_data_s {
 	time_t timestamp;
@@ -42,14 +44,20 @@ void sigint_handler(int signum)
 static void print_usage(const char *filename)
 {
 	fprintf(stderr, "Usage: %s [-r] deviceID password output_file\n", filename);
-	fprintf(stderr, "  -r Reuse address and port\n");
+	fprintf(stderr, "\t -r Reuse address and port\n");
+	fprintf(stderr, "\t -w Export waveform instead of power data\n");
+	fprintf(stderr, "\t -q Quantity of waveform points to export\n");
+	fprintf(stderr, "\t -p Phase to export waveform\n");
 	exit(EXIT_FAILURE);
 }
 
 int main(int argc, char **argv) {
 	struct sigaction sa, old_sa;
 	int opt;
-	int reuse_addr = 0;
+	int reuse_addr_opt = 0;
+	int waveform_opt = 0;
+	int waveform_qty = WAVEFORM_MAX_QTY;
+	int waveform_phase = 1;
 	char device_id[PARAM_STR_SIZE];
 	char mac_password[PARAM_STR_SIZE];
 	char output_filename[200];
@@ -61,10 +69,19 @@ int main(int argc, char **argv) {
 	
 	logger_init(stderr, LOGLEVEL_INFO);
 	
-	while ((opt = getopt(argc, argv, "r")) != -1) {
+	while ((opt = getopt(argc, argv, "rwq:p:")) != -1) {
 		switch (opt) {
 			case 'r':
-				reuse_addr = 1;
+				reuse_addr_opt = 1;
+				break;
+			case 'w':
+				waveform_opt = 1;
+				break;
+			case 'q':
+				sscanf(optarg, "%d", &waveform_qty);
+				break;
+			case 'p':
+				sscanf(optarg, "%d", &waveform_phase);
 				break;
 			default:
 				print_usage(argv[0]);
@@ -74,11 +91,21 @@ int main(int argc, char **argv) {
 	if(optind + 3 > argc)
 		print_usage(argv[0]);
 	
+	if(waveform_qty < 0 || waveform_qty > WAVEFORM_MAX_QTY) {
+		LOG_FATAL("Invalid waveform quantity parameter.\n");
+		exit(EXIT_FAILURE);
+	}
+	
+	if(waveform_phase < 1 || waveform_phase > 3) {
+		LOG_FATAL("Invalid waveform phase parameter.\n");
+		exit(EXIT_FAILURE);
+	}
+	
 	strlcpy(device_id, argv[optind], PARAM_STR_SIZE);
 	strlcpy(mac_password, argv[optind + 1], PARAM_STR_SIZE);
 	strlcpy(output_filename, argv[optind + 2], 200);
 	
-	output_fd = fopen(output_filename, "a");
+	output_fd = fopen(output_filename, waveform_opt ? "w" : "a");
 	
 	if(!output_fd) {
 		LOG_FATAL("Unable to open file %s.", output_filename);
@@ -97,7 +124,7 @@ int main(int argc, char **argv) {
 		return -1;
 	}
 	
-	if(reuse_addr)
+	if(reuse_addr_opt)
 		setsockopt(main_socket, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));
 	
 	bzero(&server_bind_address, sizeof(server_bind_address));
@@ -130,7 +157,7 @@ int main(int argc, char **argv) {
 	char aux[200];
 	char received_parameters[PARAM_MAX_QTY][PARAM_STR_SIZE];
 	
-	time_t last_timestamp;
+	time_t last_timestamp = 0;
 	
 	br_hmac_key_init(&hmac_key_ctx, &br_md5_vtable, mac_password, strlen(mac_password));
 	
@@ -186,6 +213,40 @@ int main(int argc, char **argv) {
 					LOG_ERROR("Error sending OP_SAMPLING_START command. (%s)", get_comm_status_text(command_result));
 					close(client_socket);
 				}
+			}
+			
+			if(waveform_opt == 1) {
+				float waveform_v, waveform_i;
+				
+				sprintf(aux, "%u\t%u\t", waveform_phase, waveform_qty);
+				if((command_result = send_command(client_socket, &hmac_key_ctx, OP_GET_WAVEFORM, &aux_timestamp, counter, aux))) {
+					LOG_ERROR("Error sending OP_GET_WAVEFORM command. (%d)\n", command_result);
+					close(client_socket);
+					break;
+				}
+				
+				for(int i = 0; i < waveform_qty; i++) {
+					if((command_result = receive_response(client_socket, &hmac_key_ctx, OP_GET_WAVEFORM, aux_timestamp, counter, NULL, received_parameters, 2))) {
+						LOG_ERROR("Error receiving OP_GET_WAVEFORM response. (%d)\n", command_result);
+						close(client_socket);
+						break;
+					}
+					
+					conversion_result = 0;
+					
+					conversion_result += sscanf(received_parameters[0], "%f", &waveform_v);
+					conversion_result += sscanf(received_parameters[1], "%f", &waveform_i);
+					
+					if(conversion_result == 2)
+						fprintf(output_fd, "%f,%f\n", waveform_v, waveform_i);
+					
+				}
+				
+				counter++;
+				
+				terminate = 1;
+				
+				break;
 			}
 			
 			sscanf(received_parameters[3], "%u", &qty);
