@@ -17,14 +17,11 @@
 #include "common.h"
 #include "communication.h"
 #include "tftp.h"
-#include "gnuplot.h"
 
 
 #define COMM_SERVER_PORT 2048
 
 #define TFTP_PORT 6969
-
-#define WAVEFORM_MAX_QTY 100
 
 
 typedef enum {
@@ -37,7 +34,6 @@ typedef enum {
 	ACT_READ_STATUS,
 	ACT_READ_ADV_STATUS,
 	ACT_GET_DATA,
-	ACT_PLOT_WAVEFORM,
 	ACTION_NUM
 } protocol_opcodes_t;
 
@@ -56,8 +52,7 @@ action_metadata_t action_metadata_list[ACTION_NUM] = {
 	{"fw_update",			1},
 	{"status",				0},
 	{"status_adv",			0},
-	{"get_data",			2},
-	{"plot_waveform",		2}
+	{"get_data",			2}
 };
 
 
@@ -116,7 +111,7 @@ int action_fw_update(int client_socket, br_hmac_key_context *hmac_key_ctx, int *
 	printf("Firmware file MD5 hash: %s\n", hash_result_text);
 	printf("File size: %u bytes\n", file_size);
 	
-	if((command_result = send_comand_and_receive_response(client_socket, hmac_key_ctx, OP_QUERY_STATUS, (*counter)++, NULL, received_parameters, 1))) {
+	if((command_result = send_comand_and_receive_response(client_socket, hmac_key_ctx, OP_QUERY_STATUS, (*counter)++, "A\t", received_parameters, 1))) {
 		fprintf(stderr, "Error sending query status command. (%d)\n", command_result);
 		close(client_socket);
 		return -1;
@@ -206,7 +201,6 @@ int main(int argc, char **argv) {
 		printf("\t fw_update filename\n");
 		printf("\t status\n");
 		printf("\t get_data type quantity\n");
-		printf("\t plot_waveform channel samples\n");
 		return -1;
 	}
 	
@@ -245,8 +239,6 @@ int main(int argc, char **argv) {
 	printf("Waiting for device connection on port %d...\n", COMM_SERVER_PORT);
 	fflush(stdin);
 	
-	gnuplot_ctrl *waveform_plot = NULL;
-	
 	int client_socket;
 	struct sockaddr_in client_address;
 	unsigned int client_address_size = sizeof(struct sockaddr_in);
@@ -259,14 +251,11 @@ int main(int argc, char **argv) {
 	unsigned int uptime;
 	unsigned int aux_qty;
 	unsigned int status_qty;
-	unsigned int aux_channel;
 	
 	int is_event;
 	int command_result;
 	char aux[200];
 	char received_parameters[PARAM_MAX_QTY][PARAM_STR_SIZE];
-	
-	float waveform_buffer[WAVEFORM_MAX_QTY];
 	
 	br_hmac_key_init(&hmac_key_ctx, &br_md5_vtable, argv[2], strlen(argv[2]));
 	
@@ -409,7 +398,7 @@ int main(int argc, char **argv) {
 				break;
 			}
 			
-			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_QUERY_STATUS, counter++, NULL, received_parameters, 4))) {
+			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_QUERY_STATUS, counter++, "A\t", received_parameters, 4))) {
 				fprintf(stderr, "Error sending OP_QUERY_STATUS command. (%d)\n", command_result);
 				close(client_socket);
 				break;
@@ -462,43 +451,6 @@ int main(int argc, char **argv) {
 				break;
 			}
 			break;
-		case ACT_PLOT_WAVEFORM:
-			waveform_plot = gnuplot_init();
-
-			if(sscanf(argv[4], "%u", &aux_channel) != 1 || sscanf(argv[5], "%u", &aux_qty) != 1 || aux_qty > WAVEFORM_MAX_QTY) {
-				fprintf(stderr, "Invalid argument.\n");
-				break;
-			}
-			
-			sprintf(aux, "%u\t%u\t", aux_channel, aux_qty);
-			if((command_result = send_command(client_socket, &hmac_key_ctx, OP_GET_WAVEFORM, &aux_timestamp, counter, aux))) {
-				fprintf(stderr, "Error sending OP_GET_WAVEFORM command. (%d)\n", command_result);
-				close(client_socket);
-				break;
-			}
-			
-			for(int i = 0; i < aux_qty; i++) {
-				if((command_result = receive_response(client_socket, &hmac_key_ctx, OP_GET_WAVEFORM, aux_timestamp, counter, NULL, received_parameters, 1))) {
-					fprintf(stderr, "Error receiving OP_GET_WAVEFORM response. (%d)\n", command_result);
-					close(client_socket);
-					break;
-				}
-				
-				sscanf(received_parameters[0], "%f", &waveform_buffer[i]);
-			}
-			
-			counter++;
-			
-			gnuplot_command(waveform_plot, "set terminal x11 noraise");
-			gnuplot_command(waveform_plot, "set autoscale");
-			gnuplot_command(waveform_plot, "set grid");
-			gnuplot_command(waveform_plot, "set ytics");
-			
-			sprintf(aux, "Channel %d", aux_channel);
-			
-			gnuplot_plot_data(waveform_plot, NULL, waveform_buffer, aux_qty, aux, NULL, "lp");
-			
-			break;
 		default:
 			break;
 	}
@@ -512,9 +464,6 @@ int main(int argc, char **argv) {
 	
 	shutdown(main_socket, SHUT_RDWR);
 	close(main_socket);
-	
-	gnuplot_close(waveform_plot);
-	
 	
 	return 0;
 }
