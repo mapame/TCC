@@ -246,15 +246,17 @@ int main(int argc, char **argv) {
 	br_hmac_key_context hmac_key_ctx;
 	
 	int counter = 0;
+	char aux_str[100];
 	time_t aux_timestamp;
 	time_t aux_time;
+	struct tm aux_tm;
 	unsigned int uptime;
 	unsigned int aux_qty;
 	unsigned int status_qty;
 	
 	int is_event;
 	int command_result;
-	char aux[200];
+	char txparam[200];
 	char received_parameters[PARAM_MAX_QTY][PARAM_STR_SIZE];
 	
 	br_hmac_key_init(&hmac_key_ctx, &br_md5_vtable, argv[2], strlen(argv[2]));
@@ -316,9 +318,9 @@ int main(int argc, char **argv) {
 				break;
 			}
 			
-			sprintf(aux, "%s\t%s\t", argv[4], argv[5]);
+			sprintf(txparam, "%s\t%s\t", argv[4], argv[5]);
 			
-			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_CONFIG_WRITE, counter++, aux, NULL, 0))) {
+			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_CONFIG_WRITE, counter++, txparam, NULL, 0))) {
 				fprintf(stderr, "Error sending OP_CONFIG_WRITE command. (%d)\n", command_result);
 				close(client_socket);
 				break;
@@ -333,8 +335,8 @@ int main(int argc, char **argv) {
 				break;
 			}
 			
-			sprintf(aux, "%s\t", argv[4]);
-			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_CONFIG_READ, counter++, aux, received_parameters, 1))) {
+			sprintf(txparam, "%s\t", argv[4]);
+			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_CONFIG_READ, counter++, txparam, received_parameters, 1))) {
 				fprintf(stderr, "Error sending OP_CONFIG_READ command. (%d)\n", command_result);
 				close(client_socket);
 				break;
@@ -360,9 +362,11 @@ int main(int argc, char **argv) {
 			}
 			
 			sscanf(received_parameters[1], "%ld", &aux_time);
+			localtime_r(&aux_time, &aux_tm);
+			strftime(aux_str, 100, "%F %T UTC%Z", &aux_tm);
 			
 			printf("Sampling state: %s (%s)\n", (received_parameters[0][0] == '0') ? "PAUSED" : "RUNNING", received_parameters[0]);
-			printf("RTC time: %s = %s", received_parameters[1], ctime(&aux_time));
+			printf("RTC time: %s (%s)\n", aux_str, received_parameters[1]);
 			printf("Event count: %s\n", received_parameters[2]);
 			printf("Power data count: %s\n", received_parameters[3]);
 			
@@ -413,8 +417,8 @@ int main(int argc, char **argv) {
 				break;
 			}
 			
-			sprintf(aux, "%c\t%u\t", (is_event ? 'E' : 'P'), aux_qty);
-			if((command_result = send_command(client_socket, &hmac_key_ctx, OP_GET_DATA, &aux_timestamp, counter, aux))) {
+			sprintf(txparam, "%c\t%u\t", (is_event ? 'E' : 'P'), aux_qty);
+			if((command_result = send_command(client_socket, &hmac_key_ctx, OP_GET_DATA, &aux_timestamp, counter, txparam))) {
 				fprintf(stderr, "Error sending OP_GET_DATA command. (%d)\n", command_result);
 				close(client_socket);
 				break;
@@ -428,9 +432,11 @@ int main(int argc, char **argv) {
 				}
 				
 				sscanf(received_parameters[0], "%ld", &aux_time);
+				localtime_r(&aux_time, &aux_tm);
+				strftime(aux_str, 200, "%F %T UTC%Z", &aux_tm);
 				
 				printf("--------------------------------------------------------------------------\n");
-				printf("Timestamp: %s = %s", received_parameters[0], ctime(&aux_time));
+				printf("Timestamp: %s (%s)\n", aux_str, received_parameters[0]);
 				
 				if(is_event) {
 					printf("Text: %s\n", received_parameters[1]);
@@ -443,7 +449,7 @@ int main(int argc, char **argv) {
 			
 			counter++;
 			
-			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_DELETE_DATA, counter++, aux, NULL, 0))) {
+			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_DELETE_DATA, counter++, txparam, NULL, 0))) {
 				fprintf(stderr, "Error sending OP_DELETE_DATA command. (%d)\n", command_result);
 				close(client_socket);
 				break;
