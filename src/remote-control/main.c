@@ -191,7 +191,7 @@ int main(int argc, char **argv) {
 	FILE *fw_fd = NULL;
 	
 	if(argc < 4 || (action = convert_action(argv[3])) < 0 || (argc - 4) != action_metadata_list[action].parameter_qty) {
-		printf("Usage: %s device_id mac_password action [action_parameters]\n\n", argv[0]);
+		printf("Usage: %s device_id mac_key action [action_parameters]\n\n", argv[0]);
 		printf("Actions:\n");
 		printf("\t sampling_start\n");
 		printf("\t sampling_pause\n");

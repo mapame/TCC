@@ -132,7 +132,7 @@ static enum MHD_Result ahc(void * cls, struct MHD_Connection * connection, const
 
 static void print_usage(const char *filename)
 {
-	fprintf(stderr, "Usage: %s [-r] [-p web port] deviceID password\n", filename);
+	fprintf(stderr, "Usage: %s [-r] [-p web port] device_id mac_key\n", filename);
 	fprintf(stderr, "  -r Reuse address and port\n");
 	exit(EXIT_FAILURE);
 }

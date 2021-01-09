@@ -43,7 +43,7 @@ void sigint_handler(int signum)
 
 static void print_usage(const char *filename)
 {
-	fprintf(stderr, "Usage: %s [-r] deviceID password output_file\n", filename);
+	fprintf(stderr, "Usage: %s [-r] device_id mac_key output_file\n", filename);
 	fprintf(stderr, "\t -r Reuse address and port\n");
 	fprintf(stderr, "\t -w Export waveform instead of power data\n");
 	fprintf(stderr, "\t -q Quantity of waveform points to export\n");
