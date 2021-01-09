@@ -421,7 +421,7 @@ int main(int argc, char **argv) {
 			}
 			
 			for(int i = 0; i < aux_qty; i++) {
-				if((command_result = receive_response(client_socket, &hmac_key_ctx, OP_GET_DATA, aux_timestamp, counter, NULL, received_parameters, (is_event ? 4 : 12)))) {
+				if((command_result = receive_response(client_socket, &hmac_key_ctx, OP_GET_DATA, aux_timestamp, counter, NULL, received_parameters, (is_event ? 2 : 12)))) {
 					fprintf(stderr, "Error receiving OP_GET_DATA response. (%d)\n", command_result);
 					close(client_socket);
 					break;
@@ -432,14 +432,12 @@ int main(int argc, char **argv) {
 				printf("--------------------------------------------------------------------------\n");
 				printf("Timestamp: %s = %s", received_parameters[0], ctime(&aux_time));
 				
-				if(is_event == 0) {
+				if(is_event) {
+					printf("Text: %s\n", received_parameters[1]);
+				} else {
 					printf("Samples: %s\n", received_parameters[1]);
 					printf("Duration: %s us\n", received_parameters[2]);
 					print_power_data(received_parameters[3], received_parameters[4], received_parameters[5], received_parameters[6], received_parameters[7], received_parameters[8], received_parameters[9], received_parameters[10], received_parameters[11]);
-				} else {
-					printf("Type: %s\n", received_parameters[1]);
-					printf("Count: %s\n", received_parameters[2]);
-					printf("Value: %s\n", received_parameters[3]);
 				}
 			}
 			
