@@ -4,7 +4,7 @@ bearssl:
 	make -C lib/bearssl lib
 
 remote-control: bearssl
-	gcc -Wall -o build/remote-control src/remote-control/main.c src/remote-control/tftp.c src/remote-control/gnuplot.c src/common/logger.c src/common/communication.c lib/bearssl/build/libbearssl.a -Isrc/common -Ilib/bearssl/inc -lbsd -lm
+	gcc -Wall -o build/remote-control src/remote-control/main.c src/remote-control/tftp.c src/common/logger.c src/common/communication.c lib/bearssl/build/libbearssl.a -Isrc/common -Ilib/bearssl/inc -lbsd -lm
 
 data-export: bearssl
 	gcc -Wall -o build/data-export src/data-export/main.c src/common/logger.c src/common/communication.c lib/bearssl/build/libbearssl.a -Isrc/common -Ilib/bearssl/inc -lbsd -lm
