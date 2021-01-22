@@ -43,12 +43,11 @@ void sigint_handler(int signum)
 
 static void print_usage(const char *filename)
 {
-	fprintf(stderr, "Usage: %s [-r] device_id mac_key output_file\n", filename);
+	fprintf(stderr, "Usage: %s [-r] mac_key output_file\n", filename);
 	fprintf(stderr, "\t -r Reuse address and port\n");
 	fprintf(stderr, "\t -w Export waveform instead of power data\n");
 	fprintf(stderr, "\t -q Quantity of waveform points to export\n");
 	fprintf(stderr, "\t -p Phase to export waveform\n");
-	exit(EXIT_FAILURE);
 }
 
 int main(int argc, char **argv) {
@@ -58,8 +57,7 @@ int main(int argc, char **argv) {
 	int waveform_opt = 0;
 	int waveform_qty = WAVEFORM_MAX_QTY;
 	int waveform_phase = 1;
-	char device_id[PARAM_STR_SIZE];
-	char mac_password[PARAM_STR_SIZE];
+	char mac_key[PARAM_STR_SIZE];
 	char output_filename[200];
 	
 	FILE *output_fd = NULL;
@@ -85,11 +83,14 @@ int main(int argc, char **argv) {
 				break;
 			default:
 				print_usage(argv[0]);
+				exit(EXIT_FAILURE);
 		}
 	}
 	
-	if(optind + 3 > argc)
+	if(optind + 2 > argc) {
 		print_usage(argv[0]);
+		exit(EXIT_FAILURE);
+	}
 	
 	if(waveform_qty < 0 || waveform_qty > WAVEFORM_MAX_QTY) {
 		LOG_FATAL("Invalid waveform quantity parameter.\n");
@@ -101,9 +102,8 @@ int main(int argc, char **argv) {
 		exit(EXIT_FAILURE);
 	}
 	
-	strlcpy(device_id, argv[optind], PARAM_STR_SIZE);
-	strlcpy(mac_password, argv[optind + 1], PARAM_STR_SIZE);
-	strlcpy(output_filename, argv[optind + 2], 200);
+	strlcpy(mac_key, argv[optind], PARAM_STR_SIZE);
+	strlcpy(output_filename, argv[optind + 1], 200);
 	
 	output_fd = fopen(output_filename, waveform_opt ? "w" : "a");
 	
@@ -143,7 +143,6 @@ int main(int argc, char **argv) {
 	}
 	
 	LOG_INFO("Waiting for device connection on port %d...", COMM_SERVER_PORT);
-	fflush(stdin);
 	
 	int client_socket;
 	struct sockaddr_in client_address;
@@ -159,47 +158,36 @@ int main(int argc, char **argv) {
 	
 	time_t last_timestamp = 0;
 	
-	br_hmac_key_init(&hmac_key_ctx, &br_md5_vtable, mac_password, strlen(mac_password));
+	br_hmac_key_init(&hmac_key_ctx, &br_md5_vtable, mac_key, strlen(mac_key));
 	
 	while(!terminate) {
 		power_data_t received_power_data;
 		int conversion_result;
 		int qty;
 		
-		while(!terminate) {
-			client_socket = accept(main_socket, (struct sockaddr *) &client_address, &client_address_size);
-			if(client_socket < 0) {
+		client_socket = accept(main_socket, (struct sockaddr *) &client_address, &client_address_size);
+		if(client_socket < 0) {
+			if(!terminate)
 				LOG_ERROR("Unable to accept connection.");
-				continue;
-			}
-			
-			LOG_INFO("Received connection from %s", inet_ntoa(client_address.sin_addr));
-			fflush(stdin);
-			
-			struct timeval socket_timeout_value = {.tv_sec = 2, .tv_usec = 0};
-			if(setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&socket_timeout_value, sizeof(socket_timeout_value)) < 0)
-				LOG_ERROR("Unable to set socket timeout value.");
-			
-			counter = 0;
-			
-			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_PROTOCOL_START, counter++, NULL, received_parameters, 2))) {
-				LOG_ERROR("Error sending OP_PROTOCOL_START command. (%s)", get_comm_status_text(command_result));
-				close(client_socket);
-				continue;
-			}
-			
-			if(strcmp(received_parameters[0], device_id) == 0)
-				break;
-			
-			send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_DISCONNECT, counter++, "2000\t", NULL, 0);
-			shutdown(client_socket, SHUT_RDWR);
-			close(client_socket);
-			LOG_INFO("Wrong device, disconneting...");
+			continue;
 		}
 		
-		if(!terminate) {
-			LOG_INFO("Device firmware version: %s", received_parameters[1]);
+		LOG_INFO("Received connection from %s", inet_ntoa(client_address.sin_addr));
+		
+		struct timeval socket_timeout_value = {.tv_sec = 2, .tv_usec = 0};
+		if(setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&socket_timeout_value, sizeof(socket_timeout_value)) < 0)
+			LOG_ERROR("Unable to set socket timeout value.");
+		
+		counter = 0;
+		
+		if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_PROTOCOL_START, counter++, NULL, received_parameters, 1))) {
+			LOG_ERROR("Error sending OP_PROTOCOL_START command. (%s)", get_comm_status_text(command_result));
+			close(client_socket);
+			continue;
 		}
+		
+		if(!terminate)
+			LOG_INFO("Device firmware version: %s", received_parameters[0]);
 		
 		while(!terminate) {
 			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_QUERY_STATUS, counter++, "A\t", received_parameters, 4))) {
@@ -326,10 +314,12 @@ int main(int argc, char **argv) {
 	if(terminate) {
 		LOG_INFO("Terminating...");
 		
-		if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_DISCONNECT, counter++, "1000\t", NULL, 0)))
-			LOG_ERROR("Error sending OP_DISCONNECT command. (%s)", get_comm_status_text(command_result));
-		
-		shutdown(client_socket, SHUT_RDWR);
+		if(client_socket >= 0) {
+			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_DISCONNECT, counter++, "1000\t", NULL, 0)))
+				LOG_ERROR("Error sending OP_DISCONNECT command. (%s)", get_comm_status_text(command_result));
+			
+			shutdown(client_socket, SHUT_RDWR);
+		}
 		close(client_socket);
 	}
 	

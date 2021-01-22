@@ -41,7 +41,7 @@ typedef struct power_data_s {
 } power_data_t;
 
 
-static int terminate = 0;
+static volatile int terminate = 0;
 
 pthread_mutex_t power_data_buffer_mutex;
 power_data_t power_data_buffer[POWER_DATA_BUFFER_SIZE];
@@ -132,9 +132,9 @@ static enum MHD_Result ahc(void * cls, struct MHD_Connection * connection, const
 
 static void print_usage(const char *filename)
 {
-	fprintf(stderr, "Usage: %s [-r] [-p web port] device_id mac_key\n", filename);
+	fprintf(stderr, "Usage: %s [-r] [-p http_port] mac_key\n", filename);
 	fprintf(stderr, "  -r Reuse address and port\n");
-	exit(EXIT_FAILURE);
+	fprintf(stderr, "  -p Port to start the HTTP server\n");
 }
 
 int main(int argc, char **argv) {
@@ -142,7 +142,6 @@ int main(int argc, char **argv) {
 	int opt;
 	int port = WEB_DEFAULT_PORT;
 	int reuse_addr = 0;
-	char device_id[PARAM_STR_SIZE];
 	char mac_password[PARAM_STR_SIZE];
 	
 	int main_socket;
@@ -162,14 +161,16 @@ int main(int argc, char **argv) {
 				break;
 			default:
 				print_usage(argv[0]);
+				exit(EXIT_FAILURE);
 		}
 	}
 	
-	if(optind + 2 > argc)
+	if(optind + 1 > argc) {
 		print_usage(argv[0]);
+		exit(EXIT_FAILURE);
+	}
 	
-	strlcpy(device_id, argv[optind], PARAM_STR_SIZE);
-	strlcpy(mac_password, argv[optind + 1], PARAM_STR_SIZE);
+	strlcpy(mac_password, argv[optind], PARAM_STR_SIZE);
 	
 	sa.sa_handler = sigint_handler;
 	sigemptyset(&sa.sa_mask);
@@ -208,7 +209,6 @@ int main(int argc, char **argv) {
 	}
 	
 	LOG_INFO("Waiting for device connection on port %d...", COMM_SERVER_PORT);
-	fflush(stdin);
 	
 	int client_socket;
 	struct sockaddr_in client_address;
@@ -229,40 +229,28 @@ int main(int argc, char **argv) {
 		int conversion_result;
 		int qty;
 		
-		while(!terminate) {
-			client_socket = accept(main_socket, (struct sockaddr *) &client_address, &client_address_size);
-			if(client_socket < 0) {
+		client_socket = accept(main_socket, (struct sockaddr *) &client_address, &client_address_size);
+		if(client_socket < 0) {
+			if(!terminate)
 				LOG_ERROR("Unable to accept connection.");
-				continue;
-			}
-			
-			LOG_INFO("Received connection from %s", inet_ntoa(client_address.sin_addr));
-			fflush(stdin);
-			
-			struct timeval socket_timeout_value = {.tv_sec = 2, .tv_usec = 0};
-			if(setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&socket_timeout_value, sizeof(socket_timeout_value)) < 0)
-				LOG_ERROR("Unable to set socket timeout value.");
-			
-			counter = 0;
-			
-			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_PROTOCOL_START, counter++, NULL, received_parameters, 2))) {
-				LOG_ERROR("Error sending OP_PROTOCOL_START command. (%s)", get_comm_status_text(command_result));
-				close(client_socket);
-				continue;
-			}
-			
-			if(strcmp(received_parameters[0], device_id) == 0)
-				break;
-			
-			send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_DISCONNECT, counter++, "2000\t", NULL, 0);
-			shutdown(client_socket, SHUT_RDWR);
-			close(client_socket);
-			LOG_INFO("Wrong device, disconneting...");
+			continue;
 		}
 		
-		if(!terminate) {
-			LOG_INFO("Device firmware version: %s", received_parameters[1]);
+		LOG_INFO("Received connection from %s", inet_ntoa(client_address.sin_addr));
+		
+		struct timeval socket_timeout_value = {.tv_sec = 2, .tv_usec = 0};
+		if(setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&socket_timeout_value, sizeof(socket_timeout_value)) < 0)
+			LOG_ERROR("Unable to set socket timeout value.");
+		
+		counter = 0;
+		
+		if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_PROTOCOL_START, counter++, NULL, received_parameters, 1))) {
+			LOG_ERROR("Error sending OP_PROTOCOL_START command. (%s)", get_comm_status_text(command_result));
+			close(client_socket);
+			continue;
 		}
+		
+		LOG_INFO("Device firmware version: %s", received_parameters[0]);
 		
 		while(!terminate) {
 			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_QUERY_STATUS, counter++, "A\t", received_parameters, 4))) {
@@ -361,10 +349,12 @@ int main(int argc, char **argv) {
 	if(terminate) {
 		LOG_INFO("Terminating...");
 		
-		if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_DISCONNECT, counter++, "1000\t", NULL, 0)))
-			LOG_ERROR("Error sending OP_DISCONNECT command. (%s)", get_comm_status_text(command_result));
-		
-		shutdown(client_socket, SHUT_RDWR);
+		if(client_socket >= 0) {
+			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_DISCONNECT, counter++, "1000\t", NULL, 0)))
+				LOG_ERROR("Error sending OP_DISCONNECT command. (%s)", get_comm_status_text(command_result));
+			
+			shutdown(client_socket, SHUT_RDWR);
+		}
 		close(client_socket);
 	}
 	

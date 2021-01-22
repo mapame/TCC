@@ -190,8 +190,8 @@ int main(int argc, char **argv) {
 	
 	FILE *fw_fd = NULL;
 	
-	if(argc < 4 || (action = convert_action(argv[3])) < 0 || (argc - 4) != action_metadata_list[action].parameter_qty) {
-		printf("Usage: %s device_id mac_key action [action_parameters]\n\n", argv[0]);
+	if(argc < 3 || (action = convert_action(argv[2])) < 0 || (argc - 3) != action_metadata_list[action].parameter_qty) {
+		printf("Usage: %s mac_key action [action_parameters]\n\n", argv[0]);
 		printf("Actions:\n");
 		printf("\t sampling_start\n");
 		printf("\t sampling_pause\n");
@@ -205,10 +205,10 @@ int main(int argc, char **argv) {
 	}
 	
 	if(action == ACT_FW_UPDATE) {
-		fw_fd = fopen(argv[4], "r");
+		fw_fd = fopen(argv[3], "r");
 		
 		if(fw_fd == NULL) {
-			printf("Error opening file %s.\n", argv[4]);
+			printf("Error opening file %s.\n", argv[3]);
 			return -1;
 		}
 	}
@@ -237,7 +237,6 @@ int main(int argc, char **argv) {
 	}
 	
 	printf("Waiting for device connection on port %d...\n", COMM_SERVER_PORT);
-	fflush(stdin);
 	
 	int client_socket;
 	struct sockaddr_in client_address;
@@ -259,40 +258,29 @@ int main(int argc, char **argv) {
 	char txparam[200];
 	char received_parameters[PARAM_MAX_QTY][PARAM_STR_SIZE];
 	
-	br_hmac_key_init(&hmac_key_ctx, &br_md5_vtable, argv[2], strlen(argv[2]));
+	br_hmac_key_init(&hmac_key_ctx, &br_md5_vtable, argv[1], strlen(argv[1]));
 	
-	while(1) {
-		client_socket = accept(main_socket, (struct sockaddr *) &client_address, &client_address_size);
-		if(client_socket < 0) {
-			fprintf(stderr, "Unable to accept connection.\n");
-			return -1;
-		}
-		
-		printf("Received connection from %s\n", inet_ntoa(client_address.sin_addr));
-		fflush(stdin);
-		
-		struct timeval socket_timeout_value = {.tv_sec = 2, .tv_usec = 0};
-		if(setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&socket_timeout_value, sizeof(socket_timeout_value)) < 0)
-			fprintf(stderr, "Unable to set socket timeout value.\n");
-		
-		counter = 0;
-		
-		if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_PROTOCOL_START, counter++, NULL, received_parameters, 2))) {
-			fprintf(stderr, "Error sending OP_PROTOCOL_START command. (%d)\n", command_result);
-			close(client_socket);
-			return -1;
-		}
-		
-		if(strcmp(received_parameters[0], argv[1]) == 0)
-			break;
-		
-		send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_DISCONNECT, counter++, "2000\t", NULL, 0);
-		shutdown(client_socket, SHUT_RDWR);
-		close(client_socket);
-		printf("Wrong device, disconneting...\n");
+	client_socket = accept(main_socket, (struct sockaddr *) &client_address, &client_address_size);
+	if(client_socket < 0) {
+		fprintf(stderr, "Unable to accept connection.\n");
+		return -1;
 	}
 	
-	printf("Device firmware version: %s\n\n", received_parameters[1]);
+	printf("Received connection from %s\n", inet_ntoa(client_address.sin_addr));
+	
+	struct timeval socket_timeout_value = {.tv_sec = 2, .tv_usec = 0};
+	if(setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&socket_timeout_value, sizeof(socket_timeout_value)) < 0)
+		fprintf(stderr, "Unable to set socket timeout value.\n");
+	
+	counter = 0;
+	
+	if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_PROTOCOL_START, counter++, NULL, received_parameters, 1))) {
+		fprintf(stderr, "Error sending OP_PROTOCOL_START command. (%d)\n", command_result);
+		close(client_socket);
+		return -1;
+	}
+	
+	printf("Device firmware version: %s\n\n", received_parameters[0]);
 	
 	switch(action) {
 		case ACT_START_SAMPLING:
