@@ -35,10 +35,18 @@ void logger_set_level(loglevel_t level) {
 	loglevel = level;
 }
 
-void logger_set_level_by_name(const char* level_name) {
+int logger_set_level_by_name(const char* level_name) {
+	if(level_name == NULL)
+		return -1;
+	
 	for(loglevel_t level = LOGLEVEL_TRACE; level <= LOGLEVEL_FATAL; level++)
-		if(!strcmp(level_names[level], level_name))
+		if(!strcmp(level_names[level], level_name)) {
 			loglevel = level;
+			
+			return 0;
+		}
+	
+	return -2;
 }
 
 void logger_log(loglevel_t level, const char* file, int line, const char* fmt, ...) {
@@ -50,7 +58,7 @@ void logger_log(loglevel_t level, const char* file, int line, const char* fmt, .
 		return;
 	
 	time_now = time(NULL);
-	strftime(time_str, 32, "%y-%m-%d %H:%M:%S", localtime(&time_now));
+	strftime(time_str, 32, "%Y-%m-%d %H:%M:%S", localtime(&time_now));
 	
 	va_start(fargs, fmt);
 	
@@ -59,7 +67,7 @@ void logger_log(loglevel_t level, const char* file, int line, const char* fmt, .
 	fprintf(log_fd, "%s | %s | ", time_str, level_names[level]);
 	
 	if(loglevel <= LOGLEVEL_DEBUG)
-		fprintf(log_fd, "%s:%d | ", file, line);
+		fprintf(log_fd, "%s:%d | ", (file ? file : "N/A"), line);
 	
 	vfprintf(log_fd, fmt, fargs);
 	fprintf(log_fd, "\n");
