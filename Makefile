@@ -14,4 +14,4 @@ web-test: bearssl
 
 
 backend: bearssl
-	gcc -Wall -o build/backend src/backend/main.c src/common/logger.c src/common/communication.c lib/bearssl/build/libbearssl.a lib/cJSON/cJSON.c -Isrc/common -Ilib/bearssl/inc -Ilib/cJSON -lbsd -lmicrohttpd -lm
+	gcc -Wall -o build/backend src/backend/main.c src/backend/data_acquisition.c src/common/logger.c src/common/communication.c lib/bearssl/build/libbearssl.a lib/cJSON/cJSON.c -Isrc/common -Ilib/bearssl/inc -Ilib/cJSON -pthread -lbsd -lmicrohttpd -lm

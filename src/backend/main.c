@@ -1,71 +1,102 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <bsd/string.h>
-#include <math.h>
 #include <unistd.h>
 #include <stdint.h>
-#include <time.h>
 #include <signal.h>
 #include <pthread.h>
-
-#include <sys/errno.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
 
 #include <microhttpd.h>
 #include <sqlite3.h>
 
-#include "bearssl.h"
-
-#include "cJSON.h"
-
-#include "common.h"
 #include "logger.h"
-#include "communication.h"
 
-static int terminate = 0;
 
-void sigint_handler(int signum) {
-	terminate = 1;
-}
+void *data_acquisition_loop(void *argp);
 
 int main(int argc, char **argv) {
-	struct sigaction sa, old_sa;
-	struct stat config_file_stat;
+	sigset_t signal_set;
+	int recv_signal;
+	volatile int terminate = 0;
 	
-	FILE *config_file_fd = NULL;
+	pthread_t data_acquisition_thread;
 	
-	char *config_file_content;
+	int opt;
+	int http_port = DEFAULT_HTTP_PORT;
+	char *log_level_name = NULL;
+	char *working_dir_path = NULL;
 	
 	logger_init(stderr, LOGLEVEL_INFO);
 	
-	if(argc != 2) {
-		LOG_FATAL("Missing config file path.");
-		return -1;
+	while((opt = getopt(argc, argv, "l:p:w:")) != -1) {
+		switch (opt) {
+			case 'l':
+				log_level_name = strdup(optarg);
+				break;
+			case 'p':
+				http_port = atoi(optarg);
+				break;
+			case 'w':
+				working_dir_path = strdup(optarg);
+				break;
+			default:
+				fprintf(stderr, "Usage: %s [options] -k key\n", argv[0]);
+				fprintf(stderr, "Valid options:\n");
+				fprintf(stderr, "\t-l Logging level\n");
+				fprintf(stderr, "\t-p HTTP port number\n");
+				fprintf(stderr, "\t-w Working directory path\n");
+				exit(EXIT_FAILURE);
+		}
 	}
 	
-	if(stat(argv[1], &config_file_stat)) {
-		LOG_FATAL("Failed to stat config file '%s'.", argv[1]);
-		return -1;
+	if(log_level_name != NULL) {
+		if(logger_set_level_by_name(log_level_name) != 0) {
+			LOG_FATAL("Invalid log level.");
+			LOG_FATAL("Allowed values: TRACE, DEBUG, INFO, WARN, ERROR, FATAL");
+			exit(EXIT_FAILURE);
+		}
+		
+		free(log_level_name);
 	}
 	
-	config_file_fd = fopen(argv[1], "r");
-	if(config_file_fd == NULL) {
-		LOG_FATAL("Failed to open config file '%s'.", argv[1]);
-		return -1;
+	if(http_port == 0) {
+		LOG_FATAL("Invalid HTTP port number.");
+		exit(EXIT_FAILURE);
 	}
 	
+	if(working_dir_path != NULL) {
+		if(chdir(working_dir_path) < 0) {
+			LOG_FATAL("Failed changing working directory to: %s", working_dir_path);
+			exit(EXIT_FAILURE);
+		}
+		
+		free(working_dir_path);
+	}
 	
+	if(access(DB_FILENAME, F_OK) != 0) {
+		LOG_FATAL("Database file does not exists.");
+		exit(EXIT_FAILURE);
+	}
 	
-	sa.sa_handler = sigint_handler;
-	sigemptyset(&sa.sa_mask);
-	sa.sa_flags = 0;
-	sigaction(SIGINT, &sa, &old_sa);
+	sigemptyset(&signal_set);
+	sigaddset(&signal_set, SIGINT);
+	sigaddset(&signal_set, SIGTERM);
+	sigaddset(&signal_set, SIGHUP);
 	
+	/* Bloqueia os sinais SIGINT, SIGTERM e SIGHUP, de maneira que as threads
+	 * criadas a partir de agora vão herdar esse bloqueio. */
+	pthread_sigmask(SIG_BLOCK, &signal_set, NULL);
 	
-	sigaction(SIGINT, &old_sa, NULL);
+	LOG_INFO("Starting data acquisition thread.");
+	pthread_create(&data_acquisition_thread, NULL, data_acquisition_loop, (void*) &terminate);
+	
+	/* Suspende a execução da thread principal até receber algum sinal do conjunto */
+	sigwait(&signal_set, &recv_signal);
+	
+	terminate = 1;
+	
+	pthread_join(data_acquisition_thread, NULL);
+	
 	
 	return 0;
 }
