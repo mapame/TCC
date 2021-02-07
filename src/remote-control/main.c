@@ -296,17 +296,17 @@ int main(int argc, char **argv) {
 			}
 			break;
 		case ACT_WRITE_CONFIG:
-			if(strlen(argv[4]) >= PARAM_STR_SIZE) {
+			if(strlen(argv[3]) >= PARAM_STR_SIZE) {
 				fprintf(stderr, "Config key too long.\n");
 				break;
 			}
 			
-			if(strlen(argv[5]) >= PARAM_STR_SIZE) {
+			if(strlen(argv[4]) >= PARAM_STR_SIZE) {
 				fprintf(stderr, "Config value too long.\n");
 				break;
 			}
 			
-			sprintf(txparam, "%s\t%s\t", argv[4], argv[5]);
+			sprintf(txparam, "%s\t%s\t", argv[3], argv[4]);
 			
 			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_CONFIG_WRITE, counter++, txparam, NULL, 0))) {
 				fprintf(stderr, "Error sending OP_CONFIG_WRITE command. (%d)\n", command_result);
@@ -314,23 +314,23 @@ int main(int argc, char **argv) {
 				break;
 			}
 			
-			printf("Set %s = %s.\n", argv[4], argv[5]);
+			printf("Set %s = %s.\n", argv[3], argv[4]);
 			
 			break;
 		case ACT_READ_CONFIG:
-			if(strlen(argv[4]) >= PARAM_STR_SIZE) {
+			if(strlen(argv[3]) >= PARAM_STR_SIZE) {
 				fprintf(stderr, "Config key too long.\n");
 				break;
 			}
 			
-			sprintf(txparam, "%s\t", argv[4]);
+			sprintf(txparam, "%s\t", argv[3]);
 			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_CONFIG_READ, counter++, txparam, received_parameters, 1))) {
 				fprintf(stderr, "Error sending OP_CONFIG_READ command. (%d)\n", command_result);
 				close(client_socket);
 				break;
 			}
 			
-			printf("%s = %s\n", argv[4], received_parameters[0]);
+			printf("%s = %s\n", argv[3], received_parameters[0]);
 			
 			break;
 		case ACT_RESTART_DEVICE:
@@ -374,16 +374,16 @@ int main(int argc, char **argv) {
 			
 			break;
 		case ACT_GET_DATA:
-			if(!strcmp(argv[5], "all")) {
+			if(!strcmp(argv[4], "all")) {
 					aux_qty = 10000;
-			} else if(sscanf(argv[5], "%u", &aux_qty) != 1) {
+			} else if(sscanf(argv[4], "%u", &aux_qty) != 1) {
 				fprintf(stderr, "Invalid quantity argument.\n");
 				break;
 			}
 			
-			if(!strcmp(argv[4], "event")) {
+			if(!strcmp(argv[3], "event")) {
 				is_event = 1;
-			} else if(!strcmp(argv[4], "power")) {
+			} else if(!strcmp(argv[3], "power")) {
 				is_event = 0;
 			} else {
 				fprintf(stderr, "Invalid type, must be \"power\" or \"event\".\n");
