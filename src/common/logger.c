@@ -7,10 +7,9 @@
 
 #include "logger.h"
 
-static FILE *log_fd = NULL;
-static volatile loglevel_t loglevel = LOGLEVEL_WARN;
+static pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-static pthread_mutex_t log_mutex;
+static volatile loglevel_t loglevel = LOGLEVEL_WARN;
 
 static const char *level_names[] = {
 	"TRACE",
@@ -21,18 +20,10 @@ static const char *level_names[] = {
 	"FATAL"
 };
 
-void logger_init(FILE *fd, loglevel_t level) {
-	if(log_fd)
-		return;
-	
-	log_fd = fd ? fd : stderr;
-	loglevel = level;
-	
-	pthread_mutex_init(&log_mutex, NULL);
-}
-
 void logger_set_level(loglevel_t level) {
+	pthread_mutex_lock(&log_mutex);
 	loglevel = level;
+	pthread_mutex_unlock(&log_mutex);
 }
 
 int logger_set_level_by_name(const char* level_name) {
@@ -41,7 +32,7 @@ int logger_set_level_by_name(const char* level_name) {
 	
 	for(loglevel_t level = LOGLEVEL_TRACE; level <= LOGLEVEL_FATAL; level++)
 		if(!strcmp(level_names[level], level_name)) {
-			loglevel = level;
+			logger_set_level(level);
 			
 			return 0;
 		}
@@ -54,7 +45,7 @@ void logger_log(loglevel_t level, const char* file, int line, const char* fmt, .
 	time_t time_now;
 	char time_str[32];
 	
-	if(level < loglevel || log_fd == NULL)
+	if(level < loglevel)
 		return;
 	
 	time_now = time(NULL);
@@ -64,15 +55,15 @@ void logger_log(loglevel_t level, const char* file, int line, const char* fmt, .
 	
 	pthread_mutex_lock(&log_mutex);
 	
-	fprintf(log_fd, "%s | %s | ", time_str, level_names[level]);
+	fprintf(stderr, "%s | %s | ", time_str, level_names[level]);
 	
 	if(loglevel <= LOGLEVEL_DEBUG)
-		fprintf(log_fd, "%s:%d | ", (file ? file : "N/A"), line);
+		fprintf(stderr, "%s:%d | ", (file ? file : "N/A"), line);
 	
-	vfprintf(log_fd, fmt, fargs);
-	fprintf(log_fd, "\n");
+	vfprintf(stderr, fmt, fargs);
+	fprintf(stderr, "\n");
 	
-	fflush(log_fd);
+	fflush(stderr);
 	
 	pthread_mutex_unlock(&log_mutex);
 	

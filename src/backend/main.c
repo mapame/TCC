@@ -26,8 +26,6 @@ int main(int argc, char **argv) {
 	char *log_level_name = NULL;
 	char *working_dir_path = NULL;
 	
-	logger_init(stderr, LOGLEVEL_INFO);
-	
 	while((opt = getopt(argc, argv, "l:p:w:")) != -1) {
 		switch (opt) {
 			case 'l':

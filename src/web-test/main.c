@@ -149,8 +149,6 @@ int main(int argc, char **argv) {
 	
 	struct MHD_Daemon *d;
 	
-	logger_init(stderr, LOGLEVEL_INFO);
-	
 	while ((opt = getopt(argc, argv, "rp:")) != -1) {
 		switch (opt) {
 			case 'r':
@@ -179,6 +177,8 @@ int main(int argc, char **argv) {
 	
 	power_data_buffer_pos = 0;
 	power_data_buffer_count = 0;
+	
+	logger_set_level(LOGLEVEL_INFO);
 	
 	pthread_mutex_init(&power_data_buffer_mutex, NULL);
 	

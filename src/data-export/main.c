@@ -65,7 +65,6 @@ int main(int argc, char **argv) {
 	int main_socket;
 	struct sockaddr_in server_bind_address;
 	
-	logger_init(stderr, LOGLEVEL_INFO);
 	
 	while ((opt = getopt(argc, argv, "rwq:p:")) != -1) {
 		switch (opt) {
@@ -91,6 +90,8 @@ int main(int argc, char **argv) {
 		print_usage(argv[0]);
 		exit(EXIT_FAILURE);
 	}
+	
+	logger_set_level(LOGLEVEL_INFO);
 	
 	if(waveform_qty < 0 || waveform_qty > WAVEFORM_MAX_QTY) {
 		LOG_FATAL("Invalid waveform quantity parameter.\n");
