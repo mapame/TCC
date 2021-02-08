@@ -1,8 +1,18 @@
+#ifndef COMMUNICATION_H
+#define COMMUNICATION_H
+
+#include <time.h>
+#include <arpa/inet.h>
+#include <bearssl.h>
+
+#define COMM_SERVER_PORT 2048
+
 #define PARAM_STR_SIZE 65
 #define PARAM_MAX_QTY 16
 
 typedef enum {
 	COMM_OK,
+	COMM_ERR_INVALID_CLIENT_CTX,
 	COMM_ERR_SENDING_COMMAND,
 	COMM_ERR_RECEVING_RESPONSE,
 	COMM_ERR_INVALID_MAC,
@@ -28,8 +38,21 @@ typedef enum {
 	OPCODE_NUM
 } protocol_opcode_t;
 
+typedef struct comm_client_ctx_s {
+	int socket_fd;
+	struct sockaddr_in address;
+	br_hmac_key_context hmac_key_ctx;
+	unsigned int counter;
+	time_t last_timestamp;
+	char version[16];
+} comm_client_ctx;
+
 const char * get_comm_status_text(comm_status_t status);
-int send_command(int socket_fd, const br_hmac_key_context *hmac_key_ctx, int op, time_t *timestamp_ptr, unsigned int counter, const char *parameters);
-int receive_response(int socket_fd, const br_hmac_key_context *hmac_key_ctx, int op, time_t timestamp, unsigned int counter, int *response_code, char response_parameters[][PARAM_STR_SIZE], unsigned int expected_parameter_qty);
-int send_comand_and_receive_response(int socket_fd, const br_hmac_key_context *hmac_key_ctx, int op, unsigned int counter, const char *command_parameters, char response_parameters[][PARAM_STR_SIZE], unsigned int expected_parameter_qty);
-int parse_response(char *receive_buffer, int op, time_t timestamp, unsigned int counter, int *response_code, char **parameters);
+int comm_create_main_socket(int reuse_addr);
+int comm_accept_client(int main_socket_fd, comm_client_ctx *ctx, const char *hmac_key);
+int send_command(comm_client_ctx *client_ctx, int op, const char *parameters);
+int receive_response(comm_client_ctx *client_ctx, int op, int *response_code, char response_parameters[][PARAM_STR_SIZE], unsigned int expected_parameter_qty);
+int send_comand_and_receive_response(comm_client_ctx *client_ctx, int op, const char *command_parameters, char response_parameters[][PARAM_STR_SIZE], unsigned int expected_parameter_qty);
+
+
+#endif

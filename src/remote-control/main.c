@@ -18,9 +18,6 @@
 #include "communication.h"
 #include "tftp.h"
 
-
-#define COMM_SERVER_PORT 2048
-
 #define TFTP_PORT 6969
 
 
@@ -99,7 +96,7 @@ size_t calculate_file_md5(FILE *fd, char *text_result) {
 	return total_size;
 }
 
-int action_fw_update(int client_socket, br_hmac_key_context *hmac_key_ctx, int *counter, FILE *fd) {
+int action_fw_update(comm_client_ctx *client_ctx, FILE *fd) {
 	char hash_result_text[33];
 	unsigned int file_size;
 	int command_result;
@@ -111,29 +108,29 @@ int action_fw_update(int client_socket, br_hmac_key_context *hmac_key_ctx, int *
 	printf("Firmware file MD5 hash: %s\n", hash_result_text);
 	printf("File size: %u bytes\n", file_size);
 	
-	if((command_result = send_comand_and_receive_response(client_socket, hmac_key_ctx, OP_QUERY_STATUS, (*counter)++, "A\t", received_parameters, 1))) {
-		fprintf(stderr, "Error sending query status command. (%d)\n", command_result);
-		close(client_socket);
+	if((command_result = send_comand_and_receive_response(client_ctx, OP_QUERY_STATUS, "A\t", received_parameters, 1))) {
+		fprintf(stderr, "Error sending query status command: %s\n", get_comm_status_text(command_result));
+		close(client_ctx->socket_fd);
 		return -1;
 	}
 	
 	if(strcmp(received_parameters[0], "0")) {
-		if((command_result = send_comand_and_receive_response(client_socket, hmac_key_ctx, OP_SAMPLING_PAUSE, (*counter)++, NULL, NULL, 0))) {
-			fprintf(stderr, "Error sending pause command. (%d)\n", command_result);
-			close(client_socket);
+		if((command_result = send_comand_and_receive_response(client_ctx, OP_SAMPLING_PAUSE, NULL, NULL, 0))) {
+			fprintf(stderr, "Error sending pause command: %s\n", get_comm_status_text(command_result));
+			close(client_ctx->socket_fd);
 			return -1;
 		}
 	}
 	
 	sprintf(aux, "%s\t", hash_result_text);
 	
-	if((command_result = send_comand_and_receive_response(client_socket, hmac_key_ctx, OP_FW_UPDATE, (*counter)++, aux, NULL, 0))) {
-		fprintf(stderr, "Error sending firmware update command. (%d)\n", command_result);
-		close(client_socket);
+	if((command_result = send_comand_and_receive_response(client_ctx, OP_FW_UPDATE, aux, NULL, 0))) {
+		fprintf(stderr, "Error sending firmware update command: %s\n", get_comm_status_text(command_result));
+		close(client_ctx->socket_fd);
 		return -1;
 	}
 	
-	close(client_socket);
+	close(client_ctx->socket_fd);
 	
 	if(tftp_serve_file(fd, TFTP_PORT) < 0) {
 		fprintf(stderr, "Failed to serve firmware file.\n");
@@ -186,9 +183,23 @@ int print_power_data(const char *v1, const char *v2, const char *v3, const char 
 int main(int argc, char **argv) {
 	int action = -1;
 	int main_socket;
-	struct sockaddr_in server_bind_address;
 	
 	FILE *fw_fd = NULL;
+	
+	comm_client_ctx client_ctx;
+	
+	char aux_str[100];
+	time_t aux_time;
+	struct tm aux_tm;
+	unsigned int uptime;
+	unsigned int aux_qty;
+	unsigned int status_qty;
+	
+	int is_event;
+	int command_result;
+	char txparam[200];
+	char received_parameters[PARAM_MAX_QTY][PARAM_STR_SIZE];
+	
 	
 	if(argc < 3 || (action = convert_action(argv[2])) < 0 || (argc - 3) != action_metadata_list[action].parameter_qty) {
 		printf("Usage: %s mac_key action [action_parameters]\n\n", argv[0]);
@@ -208,91 +219,39 @@ int main(int argc, char **argv) {
 		fw_fd = fopen(argv[3], "r");
 		
 		if(fw_fd == NULL) {
-			printf("Error opening file %s.\n", argv[3]);
+			fprintf(stderr, "Error opening file %s.\n", argv[3]);
 			return -1;
 		}
 	}
 	
-	main_socket = socket(PF_INET, SOCK_STREAM, 0);
+	main_socket = comm_create_main_socket(1);
+	
 	if(main_socket < 0) {
-		fprintf(stderr, "Unable to create main socket.\n");
-		return -1;
-	}
-	
-	setsockopt(main_socket, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));
-	
-	bzero(&server_bind_address, sizeof(server_bind_address));
-	server_bind_address.sin_family      = AF_INET;
-	server_bind_address.sin_addr.s_addr = htonl(INADDR_ANY);
-	server_bind_address.sin_port        = htons(COMM_SERVER_PORT);
-	
-	if(bind(main_socket, (struct sockaddr *) &server_bind_address, sizeof(server_bind_address)) < 0) {
-		fprintf(stderr, "Unable to bind main socket.\n");
-		return -1;
-	}
-	
-	if(listen(main_socket, 2) < 0) {
-		fprintf(stderr, "Unable to put main socket in listening mode.\n");
+		fprintf(stderr, "Failed to create/setup socket.\n");
 		return -1;
 	}
 	
 	printf("Waiting for device connection on port %d...\n", COMM_SERVER_PORT);
 	
-	int client_socket;
-	struct sockaddr_in client_address;
-	unsigned int client_address_size = sizeof(struct sockaddr_in);
-	
-	br_hmac_key_context hmac_key_ctx;
-	
-	int counter = 0;
-	char aux_str[100];
-	time_t aux_timestamp;
-	time_t aux_time;
-	struct tm aux_tm;
-	unsigned int uptime;
-	unsigned int aux_qty;
-	unsigned int status_qty;
-	
-	int is_event;
-	int command_result;
-	char txparam[200];
-	char received_parameters[PARAM_MAX_QTY][PARAM_STR_SIZE];
-	
-	br_hmac_key_init(&hmac_key_ctx, &br_md5_vtable, argv[1], strlen(argv[1]));
-	
-	client_socket = accept(main_socket, (struct sockaddr *) &client_address, &client_address_size);
-	if(client_socket < 0) {
-		fprintf(stderr, "Unable to accept connection.\n");
+	if(comm_accept_client(main_socket, &client_ctx, argv[1]) < 0) {
+		fprintf(stderr, "Failed to accept new client connection.\n");
 		return -1;
 	}
 	
-	printf("Received connection from %s\n", inet_ntoa(client_address.sin_addr));
-	
-	struct timeval socket_timeout_value = {.tv_sec = 2, .tv_usec = 0};
-	if(setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&socket_timeout_value, sizeof(socket_timeout_value)) < 0)
-		fprintf(stderr, "Unable to set socket timeout value.\n");
-	
-	counter = 0;
-	
-	if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_PROTOCOL_START, counter++, NULL, received_parameters, 1))) {
-		fprintf(stderr, "Error sending OP_PROTOCOL_START command. (%d)\n", command_result);
-		close(client_socket);
-		return -1;
-	}
-	
-	printf("Device firmware version: %s\n\n", received_parameters[0]);
+	printf("Received connection from %s\n", inet_ntoa(client_ctx.address.sin_addr));
+	printf("Device firmware version: %s\n\n", client_ctx.version);
 	
 	switch(action) {
 		case ACT_START_SAMPLING:
-			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_SAMPLING_START, counter++, NULL, NULL, 0))) {
-				fprintf(stderr, "Error sending OP_SAMPLING_START command. (%d)\n", command_result);
-				close(client_socket);
+			if((command_result = send_comand_and_receive_response(&client_ctx, OP_SAMPLING_START, NULL, NULL, 0))) {
+				fprintf(stderr, "Error sending OP_SAMPLING_START command: %s\n", get_comm_status_text(command_result));
+				close(client_ctx.socket_fd);
 			}
 			break;
 		case ACT_PAUSE_SAMPLING:
-			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_SAMPLING_PAUSE, counter++, NULL, NULL, 0))) {
-				fprintf(stderr, "Error sending OP_SAMPLING_PAUSE command. (%d)\n", command_result);
-				close(client_socket);
+			if((command_result = send_comand_and_receive_response(&client_ctx, OP_SAMPLING_PAUSE, NULL, NULL, 0))) {
+				fprintf(stderr, "Error sending OP_SAMPLING_PAUSE command: %s\n", get_comm_status_text(command_result));
+				close(client_ctx.socket_fd);
 			}
 			break;
 		case ACT_WRITE_CONFIG:
@@ -308,9 +267,9 @@ int main(int argc, char **argv) {
 			
 			sprintf(txparam, "%s\t%s\t", argv[3], argv[4]);
 			
-			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_CONFIG_WRITE, counter++, txparam, NULL, 0))) {
-				fprintf(stderr, "Error sending OP_CONFIG_WRITE command. (%d)\n", command_result);
-				close(client_socket);
+			if((command_result = send_comand_and_receive_response(&client_ctx, OP_CONFIG_WRITE, txparam, NULL, 0))) {
+				fprintf(stderr, "Error sending OP_CONFIG_WRITE command: %s\n", get_comm_status_text(command_result));
+				close(client_ctx.socket_fd);
 				break;
 			}
 			
@@ -324,9 +283,9 @@ int main(int argc, char **argv) {
 			}
 			
 			sprintf(txparam, "%s\t", argv[3]);
-			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_CONFIG_READ, counter++, txparam, received_parameters, 1))) {
-				fprintf(stderr, "Error sending OP_CONFIG_READ command. (%d)\n", command_result);
-				close(client_socket);
+			if((command_result = send_comand_and_receive_response(&client_ctx, OP_CONFIG_READ, txparam, received_parameters, 1))) {
+				fprintf(stderr, "Error sending OP_CONFIG_READ command: %s\n", get_comm_status_text(command_result));
+				close(client_ctx.socket_fd);
 				break;
 			}
 			
@@ -334,18 +293,18 @@ int main(int argc, char **argv) {
 			
 			break;
 		case ACT_RESTART_DEVICE:
-			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_RESTART, counter++, NULL, NULL, 0))) {
-				fprintf(stderr, "Error sending OP_RESTART command. (%d)\n", command_result);
-				close(client_socket);
+			if((command_result = send_comand_and_receive_response(&client_ctx, OP_RESTART, NULL, NULL, 0))) {
+				fprintf(stderr, "Error sending OP_RESTART command: %s\n", get_comm_status_text(command_result));
+				close(client_ctx.socket_fd);
 			}
 			break;
 		case ACT_FW_UPDATE:
-			action_fw_update(client_socket, &hmac_key_ctx, &counter, fw_fd);
+			action_fw_update(&client_ctx, fw_fd);
 			break;
 		case ACT_READ_STATUS:
-			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_QUERY_STATUS, counter++, "A\t", received_parameters, 4))) {
-				fprintf(stderr, "Error sending OP_QUERY_STATUS command. (%d)\n", command_result);
-				close(client_socket);
+			if((command_result = send_comand_and_receive_response(&client_ctx, OP_QUERY_STATUS, "A\t", received_parameters, 4))) {
+				fprintf(stderr, "Error sending OP_QUERY_STATUS command: %s\n", get_comm_status_text(command_result));
+				close(client_ctx.socket_fd);
 				break;
 			}
 			
@@ -360,9 +319,9 @@ int main(int argc, char **argv) {
 			
 			break;
 		case ACT_READ_ADV_STATUS:
-			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_QUERY_STATUS, counter++, "B\t", received_parameters, 3))) {
-				fprintf(stderr, "Error sending OP_QUERY_STATUS command. (%d)\n", command_result);
-				close(client_socket);
+			if((command_result = send_comand_and_receive_response(&client_ctx, OP_QUERY_STATUS, "B\t", received_parameters, 3))) {
+				fprintf(stderr, "Error sending OP_QUERY_STATUS command: %s\n", get_comm_status_text(command_result));
+				close(client_ctx.socket_fd);
 				break;
 			}
 			
@@ -390,9 +349,9 @@ int main(int argc, char **argv) {
 				break;
 			}
 			
-			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_QUERY_STATUS, counter++, "A\t", received_parameters, 4))) {
-				fprintf(stderr, "Error sending OP_QUERY_STATUS command. (%d)\n", command_result);
-				close(client_socket);
+			if((command_result = send_comand_and_receive_response(&client_ctx, OP_QUERY_STATUS, "A\t", received_parameters, 4))) {
+				fprintf(stderr, "Error sending OP_QUERY_STATUS command: %s\n", get_comm_status_text(command_result));
+				close(client_ctx.socket_fd);
 				break;
 			}
 			
@@ -406,16 +365,16 @@ int main(int argc, char **argv) {
 			}
 			
 			sprintf(txparam, "%c\t%u\t", (is_event ? 'E' : 'P'), aux_qty);
-			if((command_result = send_command(client_socket, &hmac_key_ctx, OP_GET_DATA, &aux_timestamp, counter, txparam))) {
-				fprintf(stderr, "Error sending OP_GET_DATA command. (%d)\n", command_result);
-				close(client_socket);
+			if((command_result = send_command(&client_ctx, OP_GET_DATA, txparam))) {
+				fprintf(stderr, "Error sending OP_GET_DATA command: %s\n", get_comm_status_text(command_result));
+				close(client_ctx.socket_fd);
 				break;
 			}
 			
 			for(int i = 0; i < aux_qty; i++) {
-				if((command_result = receive_response(client_socket, &hmac_key_ctx, OP_GET_DATA, aux_timestamp, counter, NULL, received_parameters, (is_event ? 2 : 12)))) {
-					fprintf(stderr, "Error receiving OP_GET_DATA response. (%d)\n", command_result);
-					close(client_socket);
+				if((command_result = receive_response(&client_ctx, OP_GET_DATA, NULL, received_parameters, (is_event ? 2 : 12)))) {
+					fprintf(stderr, "Error receiving OP_GET_DATA response: %s\n", get_comm_status_text(command_result));
+					close(client_ctx.socket_fd);
 					break;
 				}
 				
@@ -435,11 +394,11 @@ int main(int argc, char **argv) {
 				}
 			}
 			
-			counter++;
+			client_ctx.counter++;
 			
-			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_DELETE_DATA, counter++, txparam, NULL, 0))) {
-				fprintf(stderr, "Error sending OP_DELETE_DATA command. (%d)\n", command_result);
-				close(client_socket);
+			if((command_result = send_comand_and_receive_response(&client_ctx, OP_DELETE_DATA, txparam, NULL, 0))) {
+				fprintf(stderr, "Error sending OP_DELETE_DATA command: %s\n", get_comm_status_text(command_result));
+				close(client_ctx.socket_fd);
 				break;
 			}
 			break;
@@ -448,10 +407,10 @@ int main(int argc, char **argv) {
 	}
 	
 	if(action != ACT_FW_UPDATE && action != ACT_RESTART_DEVICE) {
-		if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_DISCONNECT, counter++, "1000\t", NULL, 0)))
-			fprintf(stderr, "Error sending OP_DISCONNECT command. (%d)\n", command_result);
-		shutdown(client_socket, SHUT_RDWR);
-		close(client_socket);
+		if((command_result = send_comand_and_receive_response(&client_ctx, OP_DISCONNECT, "1000\t", NULL, 0)))
+			fprintf(stderr, "Error sending OP_DISCONNECT command: %s\n", get_comm_status_text(command_result));
+		shutdown(client_ctx.socket_fd, SHUT_RDWR);
+		close(client_ctx.socket_fd);
 	}
 	
 	shutdown(main_socket, SHUT_RDWR);

@@ -35,6 +35,7 @@ static const char opcode_text[OPCODE_NUM][3] = {
 static const char comm_status_text_invalid[] = "Invalid status";
 static const char comm_status_text[COMM_STATUS_NUM][32] = {
 	"COMM_OK",
+	"COMM_ERR_INVALID_CLIENT_CTX",
 	"COMM_ERR_SENDING_COMMAND",
 	"COMM_ERR_RECEVING_RESPONSE",
 	"COMM_ERR_INVALID_MAC",
@@ -48,7 +49,8 @@ static int convert_opcode(char *buf);
 static void compute_hmac(const br_hmac_key_context *hmac_key_ctx, char *output_mac_text, const char *data, size_t len);
 static int validate_hmac(const br_hmac_key_context *hmac_key_ctx, char *data, size_t len);
 static int recv_command_line(int socket_fd, char *buf, size_t len);
-int parse_parameters(char *parameter_buffer, char parsed_parameters[][PARAM_STR_SIZE], unsigned int parameter_qty);
+static int parse_response(char *receive_buffer, int op, time_t timestamp, unsigned int counter, int *response_code, char **parameters);
+static int parse_parameters(char *parameter_buffer, char parsed_parameters[][PARAM_STR_SIZE], unsigned int parameter_qty);
 
 const char * get_comm_status_text(comm_status_t status) {
 	if(status >= COMM_STATUS_NUM)
@@ -57,17 +59,90 @@ const char * get_comm_status_text(comm_status_t status) {
 	return comm_status_text[status];
 }
 
-int send_comand_and_receive_response(int socket_fd, const br_hmac_key_context *hmac_key_ctx, int op, unsigned int counter, const char *command_parameters, char response_parameters[][PARAM_STR_SIZE], unsigned int expected_parameter_qty) {
-	time_t timestamp;
-	int send_result;
+int comm_create_main_socket(int reuse_addr) {
+	int socket_fd;
+	struct sockaddr_in bind_addr;
 	
-	if((send_result = send_command(socket_fd, hmac_key_ctx, op, &timestamp, counter, command_parameters)))
-		return send_result;
+	socket_fd = socket(PF_INET, SOCK_STREAM, 0);
+	if(socket_fd < 0) {
+		LOG_ERROR("Failed to create main socket.\n");
+		return -1;
+	}
 	
-	return receive_response(socket_fd, hmac_key_ctx, op, timestamp, counter, NULL, response_parameters, expected_parameter_qty);
+	if(reuse_addr)
+		setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));
+	
+	bzero(&bind_addr, sizeof(bind_addr));
+	bind_addr.sin_family      = AF_INET;
+	bind_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	bind_addr.sin_port        = htons(COMM_SERVER_PORT);
+	
+	if(bind(socket_fd, (struct sockaddr *) &bind_addr, sizeof(bind_addr)) < 0) {
+		LOG_ERROR("Failed to bind main socket.\n");
+		return -1;
+	}
+	
+	if(listen(socket_fd, 2) < 0) {
+		LOG_ERROR("Failed to put main socket in listening mode.\n");
+		return -1;
+	}
+	
+	return socket_fd;
 }
 
-int receive_response(int socket_fd, const br_hmac_key_context *hmac_key_ctx, int op, time_t timestamp, unsigned int counter, int *response_code, char response_parameters[][PARAM_STR_SIZE], unsigned int expected_parameter_qty) {
+int comm_accept_client(int main_socket_fd, comm_client_ctx *ctx, const char *hmac_key) {
+	unsigned int addr_size = sizeof(struct sockaddr_in);
+	struct timeval rcv_timeout_value = {.tv_sec = 2, .tv_usec = 0};
+	int result;
+	char received_parameters[PARAM_MAX_QTY][PARAM_STR_SIZE];
+	
+	if(main_socket_fd < 0)
+		return -1;
+	
+	if(ctx == NULL || hmac_key == NULL)
+		return -2;
+	
+	ctx->socket_fd = accept(main_socket_fd, (struct sockaddr *) &(ctx->address), &addr_size);
+	
+	if(ctx->socket_fd < 0) {
+		LOG_ERROR("Failed to accept new client connection.");
+		return -3;
+	}
+	
+	if(setsockopt(ctx->socket_fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&rcv_timeout_value, sizeof(rcv_timeout_value)) < 0)
+		LOG_WARN("Failed to set receive timeout to client socket.");
+	
+	br_hmac_key_init(&(ctx->hmac_key_ctx), &br_md5_vtable, hmac_key, strlen(hmac_key));
+	
+	ctx->counter = 0;
+	
+	if((result = send_comand_and_receive_response(ctx, OP_PROTOCOL_START, NULL, received_parameters, 1))) {
+		LOG_ERROR("Error sending OP_PROTOCOL_START command: %s\n", get_comm_status_text(result));
+		shutdown(ctx->socket_fd, SHUT_RDWR);
+		close(ctx->socket_fd);
+		ctx->socket_fd = -1;
+		return -4;
+	}
+	
+	strcpy(ctx->version, received_parameters[0]);
+	
+	return 0;
+}
+
+int send_comand_and_receive_response(comm_client_ctx *client_ctx, int op, const char *command_parameters, char response_parameters[][PARAM_STR_SIZE], unsigned int expected_parameter_qty) {
+	int result;
+	
+	if((result = send_command(client_ctx, op, command_parameters)))
+		return result;
+	
+	result = receive_response(client_ctx, op, NULL, response_parameters, expected_parameter_qty);
+	
+	client_ctx->counter++;
+	
+	return result;
+}
+
+int receive_response(comm_client_ctx *client_ctx, int op, int *response_code, char response_parameters[][PARAM_STR_SIZE], unsigned int expected_parameter_qty) {
 	char receive_buffer[200];
 	int received_line_len;
 	
@@ -76,17 +151,20 @@ int receive_response(int socket_fd, const br_hmac_key_context *hmac_key_ctx, int
 	
 	char *response_parameters_ptr;
 	
-	received_line_len = recv_command_line(socket_fd, receive_buffer, 200);
+	if(client_ctx == NULL || client_ctx->socket_fd < 0)
+		return COMM_ERR_INVALID_CLIENT_CTX;
+	
+	received_line_len = recv_command_line(client_ctx->socket_fd, receive_buffer, 200);
 	
 	if(received_line_len <= 0) // Timeout or disconnection
 		return COMM_ERR_RECEVING_RESPONSE;
 	
 	LOG_TRACE("Recv: %s\n", receive_buffer);
 	
-	if(validate_hmac(hmac_key_ctx, receive_buffer, received_line_len))
+	if(validate_hmac(&(client_ctx->hmac_key_ctx), receive_buffer, received_line_len))
 		return COMM_ERR_INVALID_MAC;
 	
-	if((result = parse_response(receive_buffer, op, timestamp, counter, &received_response_code, &response_parameters_ptr)))
+	if((result = parse_response(receive_buffer, op, client_ctx->last_timestamp, client_ctx->counter, &received_response_code, &response_parameters_ptr)))
 		return result;
 	
 	if(response_code)
@@ -103,34 +181,33 @@ int receive_response(int socket_fd, const br_hmac_key_context *hmac_key_ctx, int
 	return COMM_OK;
 }
 
-int send_command(int socket_fd, const br_hmac_key_context *hmac_key_ctx, int op, time_t *timestamp_ptr, unsigned int counter, const char *parameters) {
-	time_t timestamp;
+int send_command(comm_client_ctx *client_ctx, int op, const char *parameters) {
 	char aux[36];
 	char send_buffer[200];
 	char computed_mac_text[33];
 	
-	timestamp = time(NULL);
+	if(client_ctx == NULL || client_ctx->socket_fd < 0)
+		return COMM_ERR_INVALID_CLIENT_CTX;
 	
-	if(timestamp_ptr)
-		*timestamp_ptr = timestamp;
+	client_ctx->last_timestamp = time(NULL);
 	
-	sprintf(send_buffer, "%s:%ld:%u:", opcode_text[op], timestamp, counter);
+	sprintf(send_buffer, "%s:%ld:%u:", opcode_text[op], client_ctx->last_timestamp, client_ctx->counter);
 	
 	if(parameters)
 		strlcat(send_buffer, parameters, 200);
 	
-	compute_hmac(hmac_key_ctx, computed_mac_text, send_buffer, strlen(send_buffer));
+	compute_hmac(&(client_ctx->hmac_key_ctx), computed_mac_text, send_buffer, strlen(send_buffer));
 	
 	sprintf(aux, "*%s\n", computed_mac_text);
 	strlcat(send_buffer, aux, 200);
 	
-	if(send(socket_fd, send_buffer, strlen(send_buffer), 0) <= 0)
+	if(send(client_ctx->socket_fd, send_buffer, strlen(send_buffer), 0) <= 0)
 		return COMM_ERR_SENDING_COMMAND;
 	
 	return COMM_OK;
 }
 
-int parse_response(char *receive_buffer, int op, time_t timestamp, unsigned int counter, int *response_code, char **parameters) {
+static int parse_response(char *receive_buffer, int op, time_t timestamp, unsigned int counter, int *response_code, char **parameters) {
 	char *token;
 	char *saveptr;
 	
@@ -188,7 +265,7 @@ int parse_response(char *receive_buffer, int op, time_t timestamp, unsigned int 
 	return COMM_OK;
 }
 
-int parse_parameters(char *parameter_buffer, char parsed_parameters[][PARAM_STR_SIZE], unsigned int parameter_qty) {
+static int parse_parameters(char *parameter_buffer, char parsed_parameters[][PARAM_STR_SIZE], unsigned int parameter_qty) {
 	char *buffer_ptr = parameter_buffer;
 	char *token;
 	char *saveptr;

@@ -131,12 +131,9 @@ static int load_saved_power_data() {
 
 void *data_acquisition_loop(void *argp) {
 	int *terminate = (int*) argp;
-	int main_socket, client_socket;
-	struct sockaddr_in server_bind_address, client_address;
-	unsigned int client_address_size = sizeof(struct sockaddr_in);
+	int main_socket;
+	comm_client_ctx client_ctx;
 	int result;
-	int counter;
-	br_hmac_key_context hmac_key_ctx;
 	time_t last_loaded_timestamp = 0;
 	char pd_filename[32];
 	char new_pd_filename[32];
@@ -154,30 +151,10 @@ void *data_acquisition_loop(void *argp) {
 	if(power_data_buffer_count > 0)
 		last_loaded_timestamp = power_data_buffer[(power_data_buffer_pos == 0) ? (POWER_DATA_BUFFER_SIZE - 1) : (power_data_buffer_pos - 1)].timestamp;
 	
-	br_hmac_key_init(&hmac_key_ctx, &br_md5_vtable, mac_key, strlen(mac_key));
+	main_socket = comm_create_main_socket(1);
 	
-	main_socket = socket(PF_INET, SOCK_STREAM, 0);
 	if(main_socket < 0) {
-		LOG_FATAL("Failed to create main socket.");
-		return NULL;
-	}
-	
-	setsockopt(main_socket, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));
-	
-	bzero(&server_bind_address, sizeof(server_bind_address));
-	server_bind_address.sin_family      = AF_INET;
-	server_bind_address.sin_addr.s_addr = htonl(INADDR_ANY);
-	server_bind_address.sin_port        = htons(COMM_PORT);
-	
-	if(bind(main_socket, (struct sockaddr *) &server_bind_address, sizeof(server_bind_address)) < 0) {
-		LOG_FATAL("Failed to bind main socket.");
-		close(main_socket);
-		return NULL;
-	}
-	
-	if(listen(main_socket, 2) < 0) {
-		LOG_FATAL("Failed to listen in the main socket.");
-		close(main_socket);
+		LOG_ERROR("Failed to create/setup socket.");
 		return NULL;
 	}
 	
@@ -186,32 +163,16 @@ void *data_acquisition_loop(void *argp) {
 	while(!(*terminate)) {
 		char param_str[16];
 		power_data_t pd_aux;
-		time_t aux_timestamp;
 		char received_parameters[PARAM_MAX_QTY][PARAM_STR_SIZE];
 		int qty;
 		
-		client_socket = accept(main_socket, (struct sockaddr *) &client_address, &client_address_size);
-		if(client_socket < 0) {
-			if(!(*terminate))
-				LOG_ERROR("Failed to accept connection.");
+		if(comm_accept_client(main_socket, &client_ctx, mac_key) < 0) {
+			LOG_ERROR("Failed to accept new client connection.");
 			continue;
 		}
 		
-		LOG_INFO("Received connection from %s", inet_ntoa(client_address.sin_addr));
-		
-		struct timeval socket_timeout_value = {.tv_sec = 2, .tv_usec = 0};
-		if(setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&socket_timeout_value, sizeof(socket_timeout_value)) < 0)
-			LOG_ERROR("Failed to set socket timeout.");
-		
-		counter = 0;
-		
-		if((result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_PROTOCOL_START, counter++, NULL, received_parameters, 1))) {
-			LOG_ERROR("Error sending OP_PROTOCOL_START command. (%s)", get_comm_status_text(result));
-			close(client_socket);
-			continue;
-		}
-		
-		LOG_INFO("Device firmware version: %s", received_parameters[0]);
+		LOG_INFO("Received connection from %s", inet_ntoa(client_ctx.address.sin_addr));
+		LOG_INFO("Device firmware version: %s", client_ctx.version);
 		
 		while(!(*terminate)) {
 			generate_pd_filename(time(NULL), new_pd_filename, sizeof(pd_filename));
@@ -233,16 +194,16 @@ void *data_acquisition_loop(void *argp) {
 				strcpy(pd_filename, new_pd_filename);
 			}
 			
-			if((result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_QUERY_STATUS, counter++, "A\t", received_parameters, 4))) {
+			if((result = send_comand_and_receive_response(&client_ctx, OP_QUERY_STATUS, "A\t", received_parameters, 4))) {
 				LOG_ERROR("Error sending OP_QUERY_STATUS command. (%s)", get_comm_status_text(result));
-				close(client_socket);
+				close(client_ctx.socket_fd);
 				break;
 			}
 			
 			if(*received_parameters[0] == '0') {
-				if((result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_SAMPLING_START, counter++, NULL, NULL, 0))) {
+				if((result = send_comand_and_receive_response(&client_ctx, OP_SAMPLING_START, NULL, NULL, 0))) {
 					LOG_ERROR("Error sending OP_SAMPLING_START command. (%s)", get_comm_status_text(result));
-					close(client_socket);
+					close(client_ctx.socket_fd);
 				}
 			}
 			
@@ -253,16 +214,16 @@ void *data_acquisition_loop(void *argp) {
 			
 			sprintf(param_str, "P\t%u\t", qty);
 			
-			if((result = send_command(client_socket, &hmac_key_ctx, OP_GET_DATA, &aux_timestamp, counter, param_str))) {
+			if((result = send_command(&client_ctx, OP_GET_DATA, param_str))) {
 				LOG_ERROR("Error sending OP_GET_DATA command. (%s)", get_comm_status_text(result));
-				close(client_socket);
+				close(client_ctx.socket_fd);
 				break;
 			}
 			
 			for(int i = 0; i < qty; i++) {
-				if((result = receive_response(client_socket, &hmac_key_ctx, OP_GET_DATA, aux_timestamp, counter, NULL, received_parameters, 12))) {
+				if((result = receive_response(&client_ctx, OP_GET_DATA, NULL, received_parameters, 12))) {
 					LOG_ERROR("Error receiving OP_GET_DATA response. (%s)", get_comm_status_text(result));
-					close(client_socket);
+					close(client_ctx.socket_fd);
 					break;
 				}
 				memset(&pd_aux, 0, sizeof(power_data_t));
@@ -310,11 +271,11 @@ void *data_acquisition_loop(void *argp) {
 			
 			fflush(pd_file);
 			
-			counter++;
+			client_ctx.counter++;
 			
-			if((result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_DELETE_DATA, counter++, param_str, NULL, 0))) {
+			if((result = send_comand_and_receive_response(&client_ctx, OP_DELETE_DATA, param_str, NULL, 0))) {
 				LOG_ERROR("Error sending OP_DELETE_DATA command. (%s)", get_comm_status_text(result));
-				close(client_socket);
+				close(client_ctx.socket_fd);
 				break;
 			}
 			
@@ -327,13 +288,13 @@ void *data_acquisition_loop(void *argp) {
 	if(*terminate) {
 		LOG_INFO("Terminating data acquisition thread.");
 		
-		if(client_socket >= 0) {
-			if((result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_DISCONNECT, counter++, "1000\t", NULL, 0)))
+		if(client_ctx.socket_fd >= 0) {
+			if((result = send_comand_and_receive_response(&client_ctx, OP_DISCONNECT, "1000\t", NULL, 0)))
 				LOG_ERROR("Error sending OP_DISCONNECT command. (%s)", get_comm_status_text(result));
 			
-			shutdown(client_socket, SHUT_RDWR);
+			shutdown(client_ctx.socket_fd, SHUT_RDWR);
 		}
-		close(client_socket);
+		close(client_ctx.socket_fd);
 	}
 	
 	shutdown(main_socket, SHUT_RDWR);

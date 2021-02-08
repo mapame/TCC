@@ -24,7 +24,6 @@
 #include "logger.h"
 #include "communication.h"
 
-#define COMM_SERVER_PORT 2048
 #define WEB_DEFAULT_PORT 8081
 
 #define POWER_DATA_BUFFER_SIZE 200
@@ -144,8 +143,12 @@ int main(int argc, char **argv) {
 	int reuse_addr = 0;
 	char mac_password[PARAM_STR_SIZE];
 	
+	int command_result;
+	char aux[200];
+	char received_parameters[PARAM_MAX_QTY][PARAM_STR_SIZE];
+	
 	int main_socket;
-	struct sockaddr_in server_bind_address;
+	comm_client_ctx client_ctx;
 	
 	struct MHD_Daemon *d;
 	
@@ -184,85 +187,39 @@ int main(int argc, char **argv) {
 	
 	d = MHD_start_daemon(MHD_USE_THREAD_PER_CONNECTION | MHD_USE_INTERNAL_POLLING_THREAD | MHD_USE_ERROR_LOG, port, NULL, NULL, &ahc, NULL, MHD_OPTION_END);
 	
-	main_socket = socket(PF_INET, SOCK_STREAM, 0);
+	main_socket = comm_create_main_socket(reuse_addr);
+	
 	if(main_socket < 0) {
-		LOG_FATAL("Unable to create main socket.");
+		LOG_ERROR("Failed to create/setup socket.");
 		return -1;
 	}
 	
-	if(reuse_addr)
-		setsockopt(main_socket, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));
-	
-	bzero(&server_bind_address, sizeof(server_bind_address));
-	server_bind_address.sin_family      = AF_INET;
-	server_bind_address.sin_addr.s_addr = htonl(INADDR_ANY);
-	server_bind_address.sin_port        = htons(COMM_SERVER_PORT);
-	
-	if(bind(main_socket, (struct sockaddr *) &server_bind_address, sizeof(server_bind_address)) < 0) {
-		LOG_FATAL("Unable to bind main socket.");
-		return -1;
-	}
-	
-	if(listen(main_socket, 2) < 0) {
-		LOG_FATAL("Unable to put main socket in listening mode.");
-		return -1;
-	}
-	
-	LOG_INFO("Waiting for device connection on port %d...", COMM_SERVER_PORT);
-	
-	int client_socket;
-	struct sockaddr_in client_address;
-	unsigned int client_address_size = sizeof(struct sockaddr_in);
-	
-	br_hmac_key_context hmac_key_ctx;
-	
-	int counter = 0;
-	time_t aux_timestamp;
-	int command_result;
-	char aux[200];
-	char received_parameters[PARAM_MAX_QTY][PARAM_STR_SIZE];
-	
-	br_hmac_key_init(&hmac_key_ctx, &br_md5_vtable, mac_password, strlen(mac_password));
+	LOG_INFO("Waiting for device connection on port %d.", COMM_SERVER_PORT);
 	
 	while(!terminate) {
 		power_data_t power_data_aux;
 		int conversion_result;
 		int qty;
 		
-		client_socket = accept(main_socket, (struct sockaddr *) &client_address, &client_address_size);
-		if(client_socket < 0) {
-			if(!terminate)
-				LOG_ERROR("Unable to accept connection.");
+		if(comm_accept_client(main_socket, &client_ctx, mac_password) < 0) {
+			LOG_ERROR("Failed to accept new client connection.");
 			continue;
 		}
 		
-		LOG_INFO("Received connection from %s", inet_ntoa(client_address.sin_addr));
-		
-		struct timeval socket_timeout_value = {.tv_sec = 2, .tv_usec = 0};
-		if(setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&socket_timeout_value, sizeof(socket_timeout_value)) < 0)
-			LOG_ERROR("Unable to set socket timeout value.");
-		
-		counter = 0;
-		
-		if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_PROTOCOL_START, counter++, NULL, received_parameters, 1))) {
-			LOG_ERROR("Error sending OP_PROTOCOL_START command. (%s)", get_comm_status_text(command_result));
-			close(client_socket);
-			continue;
-		}
-		
-		LOG_INFO("Device firmware version: %s", received_parameters[0]);
+		LOG_INFO("Received connection from %s", inet_ntoa(client_ctx.address.sin_addr));
+		LOG_INFO("Device firmware version: %s", client_ctx.version);
 		
 		while(!terminate) {
-			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_QUERY_STATUS, counter++, "A\t", received_parameters, 4))) {
+			if((command_result = send_comand_and_receive_response(&client_ctx, OP_QUERY_STATUS, "A\t", received_parameters, 4))) {
 				LOG_ERROR("Error sending OP_QUERY_STATUS command. (%s)", get_comm_status_text(command_result));
-				close(client_socket);
+				close(client_ctx.socket_fd);
 				break;
 			}
 			
 			if(*received_parameters[0] == '0') {
-				if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_SAMPLING_START, counter++, NULL, NULL, 0))) {
+				if((command_result = send_comand_and_receive_response(&client_ctx, OP_SAMPLING_START, NULL, NULL, 0))) {
 					LOG_ERROR("Error sending OP_SAMPLING_START command. (%s)", get_comm_status_text(command_result));
-					close(client_socket);
+					close(client_ctx.socket_fd);
 				}
 			}
 			
@@ -273,16 +230,16 @@ int main(int argc, char **argv) {
 			
 			sprintf(aux, "P\t%u\t", qty);
 			
-			if((command_result = send_command(client_socket, &hmac_key_ctx, OP_GET_DATA, &aux_timestamp, counter, aux))) {
+			if((command_result = send_command(&client_ctx, OP_GET_DATA, aux))) {
 				LOG_ERROR("Error sending OP_GET_DATA command. (%s)", get_comm_status_text(command_result));
-				close(client_socket);
+				close(client_ctx.socket_fd);
 				break;
 			}
 			
 			for(int i = 0; i < qty; i++) {
-				if((command_result = receive_response(client_socket, &hmac_key_ctx, OP_GET_DATA, aux_timestamp, counter, NULL, received_parameters, 12))) {
+				if((command_result = receive_response(&client_ctx, OP_GET_DATA, NULL, received_parameters, 12))) {
 					LOG_ERROR("Error receiving OP_GET_DATA response. (%s)", get_comm_status_text(command_result));
-					close(client_socket);
+					close(client_ctx.socket_fd);
 					break;
 				}
 				memset(&power_data_aux, 0, sizeof(power_data_t));
@@ -328,11 +285,11 @@ int main(int argc, char **argv) {
 				}
 			}
 			
-			counter++;
+			client_ctx.counter++;
 			
-			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_DELETE_DATA, counter++, aux, NULL, 0))) {
+			if((command_result = send_comand_and_receive_response(&client_ctx, OP_DELETE_DATA, aux, NULL, 0))) {
 				LOG_ERROR("Error sending OP_DELETE_DATA command. (%s)", get_comm_status_text(command_result));
-				close(client_socket);
+				close(client_ctx.socket_fd);
 				break;
 			}
 			
@@ -349,13 +306,13 @@ int main(int argc, char **argv) {
 	if(terminate) {
 		LOG_INFO("Terminating...");
 		
-		if(client_socket >= 0) {
-			if((command_result = send_comand_and_receive_response(client_socket, &hmac_key_ctx, OP_DISCONNECT, counter++, "1000\t", NULL, 0)))
+		if(client_ctx.socket_fd >= 0) {
+			if((command_result = send_comand_and_receive_response(&client_ctx, OP_DISCONNECT, "1000\t", NULL, 0)))
 				LOG_ERROR("Error sending OP_DISCONNECT command. (%s)", get_comm_status_text(command_result));
 			
-			shutdown(client_socket, SHUT_RDWR);
+			shutdown(client_ctx.socket_fd, SHUT_RDWR);
 		}
-		close(client_socket);
+		close(client_ctx.socket_fd);
 	}
 	
 	shutdown(main_socket, SHUT_RDWR);
