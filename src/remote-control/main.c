@@ -12,7 +12,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
-#include "bearssl.h"
+#include <openssl/evp.h>
 
 #include "common.h"
 #include "communication.h"
@@ -64,34 +64,32 @@ int convert_action(char *buf) {
 	return -1;
 }
 
-size_t calculate_file_md5(FILE *fd, char *text_result) {
-	br_md5_context hash_context;
-	uint8_t buffer[1024];
+size_t calculate_file_md5(FILE *fd, char *text_result, size_t output_size) {
+	EVP_MD_CTX *mdctx = NULL;
+	unsigned char buffer[1024];
 	size_t size_read, total_size = 0;
-	uint8_t hash_result[16];
+	unsigned char hash_result[EVP_MAX_MD_SIZE];
+	unsigned int hash_result_size;
 	
-	char aux[3];
-	
-	br_md5_init(&hash_context);
+	mdctx = EVP_MD_CTX_new();
+	EVP_DigestInit_ex(mdctx, EVP_md5(), NULL);
 	
 	rewind(fd);
 	
 	while(!feof(fd)) {
 		size_read = fread(buffer, 1, 1024, fd);
 		total_size += size_read;
-		br_md5_update(&hash_context, buffer, size_read);
+		EVP_DigestUpdate(mdctx, buffer, size_read);
 	}
 	
 	rewind(fd);
 	
-	br_md5_out(&hash_context, hash_result);
+	EVP_DigestFinal_ex(mdctx, hash_result, &hash_result_size);
 	
-	text_result[0] = '\0';
+	for(int i = 0; (i < hash_result_size) && (output_size - i * 2) >= 2; i++)
+		snprintf(text_result + i * 2, output_size - i * 2, "%02x", hash_result[i]);
 	
-	for(int i = 0; i < 16; i++) {
-		sprintf(aux, "%02hx", hash_result[i]);
-		strlcat(text_result, aux, 33);
-	}
+	EVP_MD_CTX_free(mdctx);
 	
 	return total_size;
 }
@@ -103,7 +101,7 @@ int action_fw_update(comm_client_ctx *client_ctx, FILE *fd) {
 	char received_parameters[PARAM_MAX_QTY][PARAM_STR_SIZE];
 	char aux[100];
 	
-	file_size = calculate_file_md5(fd, hash_result_text);
+	file_size = calculate_file_md5(fd, hash_result_text, 33);
 	
 	printf("Firmware file MD5 hash: %s\n", hash_result_text);
 	printf("File size: %u bytes\n", file_size);

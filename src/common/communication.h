@@ -3,7 +3,6 @@
 
 #include <time.h>
 #include <arpa/inet.h>
-#include <bearssl.h>
 
 #define COMM_SERVER_PORT 2048
 
@@ -41,10 +40,10 @@ typedef enum {
 typedef struct comm_client_ctx_s {
 	int socket_fd;
 	struct sockaddr_in address;
-	br_hmac_key_context hmac_key_ctx;
 	unsigned int counter;
 	time_t last_timestamp;
 	char version[16];
+	char hmac_key[128];
 } comm_client_ctx;
 
 const char * get_comm_status_text(comm_status_t status);

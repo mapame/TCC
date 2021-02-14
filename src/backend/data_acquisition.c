@@ -9,8 +9,6 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 
-#include "bearssl.h"
-
 #include "common.h"
 #include "logger.h"
 #include "communication.h"

@@ -13,8 +13,6 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
-#include "bearssl.h"
-
 #include "common.h"
 #include "logger.h"
 #include "communication.h"

@@ -16,8 +16,6 @@
 
 #include <microhttpd.h>
 
-#include "bearssl.h"
-
 #include "cJSON.h"
 
 #include "common.h"

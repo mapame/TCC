@@ -11,7 +11,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
-#include "bearssl.h"
+#include <openssl/hmac.h>
 
 #include "communication.h"
 #include "logger.h"
@@ -46,8 +46,8 @@ static const char comm_status_text[COMM_STATUS_NUM][32] = {
 
 
 static int convert_opcode(char *buf);
-static void compute_hmac(const br_hmac_key_context *hmac_key_ctx, char *output_mac_text, const char *data, size_t len);
-static int validate_hmac(const br_hmac_key_context *hmac_key_ctx, char *data, size_t len);
+static void compute_hmac(const char *key, char *output_hmac, size_t output_size, const char *data, size_t data_len);
+static int validate_hmac(const char *key, const char *data, size_t len);
 static int recv_command_line(int socket_fd, char *buf, size_t len);
 static int parse_response(char *receive_buffer, int op, time_t timestamp, unsigned int counter, int *response_code, char **parameters);
 static int parse_parameters(char *parameter_buffer, char parsed_parameters[][PARAM_STR_SIZE], unsigned int parameter_qty);
@@ -112,7 +112,8 @@ int comm_accept_client(int main_socket_fd, comm_client_ctx *ctx, const char *hma
 	if(setsockopt(ctx->socket_fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&rcv_timeout_value, sizeof(rcv_timeout_value)) < 0)
 		LOG_WARN("Failed to set receive timeout to client socket.");
 	
-	br_hmac_key_init(&(ctx->hmac_key_ctx), &br_md5_vtable, hmac_key, strlen(hmac_key));
+	strncpy(ctx->hmac_key, hmac_key, sizeof(ctx->hmac_key));
+	ctx->hmac_key[sizeof(ctx->hmac_key) - 1] = '\0';
 	
 	ctx->counter = 0;
 	
@@ -161,8 +162,10 @@ int receive_response(comm_client_ctx *client_ctx, int op, int *response_code, ch
 	
 	LOG_TRACE("Recv: %s\n", receive_buffer);
 	
-	if(validate_hmac(&(client_ctx->hmac_key_ctx), receive_buffer, received_line_len))
+	if(validate_hmac(client_ctx->hmac_key, receive_buffer, received_line_len))
 		return COMM_ERR_INVALID_MAC;
+	
+	receive_buffer[received_line_len - 33] = '\0';
 	
 	if((result = parse_response(receive_buffer, op, client_ctx->last_timestamp, client_ctx->counter, &received_response_code, &response_parameters_ptr)))
 		return result;
@@ -196,7 +199,7 @@ int send_command(comm_client_ctx *client_ctx, int op, const char *parameters) {
 	if(parameters)
 		strlcat(send_buffer, parameters, 200);
 	
-	compute_hmac(&(client_ctx->hmac_key_ctx), computed_mac_text, send_buffer, strlen(send_buffer));
+	compute_hmac(client_ctx->hmac_key, computed_mac_text, 33, send_buffer, strlen(send_buffer));
 	
 	sprintf(aux, "*%s\n", computed_mac_text);
 	strlcat(send_buffer, aux, 200);
@@ -321,46 +324,31 @@ static int convert_opcode(char *buf) {
 	return -1;
 }
 
-static void compute_hmac(const br_hmac_key_context *hmac_key_ctx, char *output_mac_text, const char *data, size_t len) {
-	br_hmac_context hmac_ctx;
-	uint8_t computed_mac[16];
-	char aux[3];
+static void compute_hmac(const char *key, char *output_hmac, size_t output_size, const char *data, size_t data_len) {
+	unsigned char computed_hmac[EVP_MAX_MD_SIZE];
+	unsigned int result_len;
 	
-	br_hmac_init(&hmac_ctx, hmac_key_ctx, 0);
+	HMAC(EVP_md5(), (void*)key, strlen(key), (const unsigned char*) data, data_len, computed_hmac, &result_len);
 	
-	br_hmac_update(&hmac_ctx, data, len);
-	
-	br_hmac_out(&hmac_ctx, computed_mac);
-	
-	output_mac_text[0] = '\0';
-	
-	for(int i = 0; i < 16; i++) {
-		sprintf(aux, "%02hx", computed_mac[i]);
-		strlcat(output_mac_text, aux, 33);
-	}
+	for(int i = 0; (i < result_len) && (output_size - i * 2) >= 2; i++)
+		snprintf(output_hmac + i * 2, output_size - i * 2, "%02x", computed_hmac[i]);
 }
 
-static int validate_hmac(const br_hmac_key_context *hmac_key_ctx, char *data, size_t len) {
-	char *received_mac_text;
+static int validate_hmac(const char *key, const char *data, size_t len) {
+	const char *received_mac_ptr;
 	char computed_mac_text[33];
 	
 	if(data[len - 33] != '*') // Protocol error - Syntax Error
 		return -1;
 	
-	data[len - 33] = '\0';
+	received_mac_ptr = &(data[len - 32]);
 	
-	received_mac_text = &(data[len - 32]);
-	
-	if(strlen(received_mac_text) != 32)
+	if(strlen(received_mac_ptr) != 32)
 		return -1;
 	
-	LOG_TRACE("Received HMAC:   %s\n", received_mac_text);
+	compute_hmac(key, computed_mac_text, 33, data, len - 33);
 	
-	compute_hmac(hmac_key_ctx, computed_mac_text, data, len - 33);
-	
-	LOG_TRACE("Calculated HMAC: %s\n", computed_mac_text);
-	
-	if(strcmp(received_mac_text, computed_mac_text)) // Protocol error - Invalid MAC
+	if(strcmp(received_mac_ptr, computed_mac_text)) // Protocol error - Invalid MAC
 		return -2;
 	
 	return 0;

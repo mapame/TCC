@@ -1,17 +1,13 @@
 all: remote-control data-export web-test backend
 
-bearssl:
-	make -C lib/bearssl lib
+remote-control:
+	gcc -Wall -o build/remote-control src/remote-control/main.c src/remote-control/tftp.c src/common/logger.c src/common/communication.c -Isrc/common -lcrypto -lbsd -lm
 
-remote-control: bearssl
-	gcc -Wall -o build/remote-control src/remote-control/main.c src/remote-control/tftp.c src/common/logger.c src/common/communication.c lib/bearssl/build/libbearssl.a -Isrc/common -Ilib/bearssl/inc -lbsd -lm
+data-export:
+	gcc -Wall -o build/data-export src/data-export/main.c src/common/logger.c src/common/communication.c -Isrc/common -lcrypto -lbsd -lm
 
-data-export: bearssl
-	gcc -Wall -o build/data-export src/data-export/main.c src/common/logger.c src/common/communication.c lib/bearssl/build/libbearssl.a -Isrc/common -Ilib/bearssl/inc -lbsd -lm
+web-test:
+	gcc -Wall -o build/web-test src/web-test/main.c src/common/logger.c src/common/communication.c lib/cJSON/cJSON.c -Isrc/common -Ilib/cJSON -lcrypto -lbsd -lmicrohttpd -lm
 
-web-test: bearssl
-	gcc -Wall -o build/web-test src/web-test/main.c src/common/logger.c src/common/communication.c lib/bearssl/build/libbearssl.a lib/cJSON/cJSON.c -Isrc/common -Ilib/bearssl/inc -Ilib/cJSON -lbsd -lmicrohttpd -lm
-
-
-backend: bearssl
-	gcc -Wall -o build/backend src/backend/main.c src/backend/data_acquisition.c src/common/logger.c src/common/communication.c lib/bearssl/build/libbearssl.a lib/cJSON/cJSON.c -Isrc/common -Ilib/bearssl/inc -Ilib/cJSON -pthread -lbsd -lmicrohttpd -lm
+backend:
+	gcc -Wall -o build/backend src/backend/main.c src/backend/data_acquisition.c src/backend/http.c src/backend/http_auth.c src/backend/auth.c src/common/logger.c src/common/communication.c -Isrc/common -pthread -lcrypto -lbsd -lmicrohttpd -lm -ljson-c -lsqlite3 -luuid
