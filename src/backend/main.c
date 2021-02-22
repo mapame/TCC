@@ -10,7 +10,8 @@
 #include <sqlite3.h>
 
 #include "logger.h"
-
+#include "database.h"
+#include "http.h"
 
 void *data_acquisition_loop(void *argp);
 
@@ -19,12 +20,14 @@ int main(int argc, char **argv) {
 	int recv_signal;
 	volatile int terminate = 0;
 	
-	pthread_t data_acquisition_thread;
-	
 	int opt;
 	int http_port = DEFAULT_HTTP_PORT;
 	char *log_level_name = NULL;
 	char *working_dir_path = NULL;
+	
+	pthread_t data_acquisition_thread;
+	
+	struct MHD_Daemon *httpd;
 	
 	while((opt = getopt(argc, argv, "l:p:w:")) != -1) {
 		switch (opt) {
@@ -88,13 +91,17 @@ int main(int argc, char **argv) {
 	LOG_INFO("Starting data acquisition thread.");
 	pthread_create(&data_acquisition_thread, NULL, data_acquisition_loop, (void*) &terminate);
 	
+	LOG_INFO("Starting HTTP server.");
+	httpd = http_init(http_port);
+	
 	/* Suspende a execução da thread principal até receber algum sinal do conjunto */
 	sigwait(&signal_set, &recv_signal);
 	
 	terminate = 1;
 	
-	pthread_join(data_acquisition_thread, NULL);
+	http_stop(httpd);
 	
+	pthread_join(data_acquisition_thread, NULL);
 	
 	return 0;
 }
