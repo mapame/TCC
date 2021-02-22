@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <unistd.h>
+#include <string.h>
 #include <math.h>
 #include <time.h>
 #include <errno.h>
@@ -11,6 +12,7 @@
 
 #include "common.h"
 #include "logger.h"
+#include "configs.h"
 #include "communication.h"
 #include "power_data.h"
 
@@ -25,8 +27,6 @@
 										var.p[0], var.p[1], var.p[2]
 #define POWER_DATA_STORAGE_ARG_QTY 10
 
-
-const char mac_key[8] = "abc123";
 
 pthread_mutex_t power_data_buffer_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -159,13 +159,17 @@ void *data_acquisition_loop(void *argp) {
 	LOG_INFO("Waiting for device connection on port %d.", COMM_PORT);
 	
 	while(!(*terminate)) {
+		char mac_key[32] = "";
 		char param_str[16];
 		power_data_t pd_aux;
 		char received_parameters[PARAM_MAX_QTY][PARAM_STR_SIZE];
 		int qty;
 		
+		configs_get_value("device_mac_key", mac_key, sizeof(mac_key));
+		
 		if(comm_accept_client(main_socket, &client_ctx, mac_key) < 0) {
 			LOG_ERROR("Failed to accept new client connection.");
+			sleep(1);
 			continue;
 		}
 		
