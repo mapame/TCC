@@ -29,12 +29,12 @@
 
 typedef struct power_data_s {
 	time_t timestamp;
-	double v[3];
-	double i[3];
-	double p[3];
-	double s[3];
-	double q[3];
-	double pf[3];
+	double v[2];
+	double i[2];
+	double p[2];
+	double s[2];
+	double q[2];
+	double pf[2];
 } power_data_t;
 
 
@@ -235,7 +235,7 @@ int main(int argc, char **argv) {
 			}
 			
 			for(int i = 0; i < qty; i++) {
-				if((command_result = receive_response(&client_ctx, OP_GET_DATA, NULL, received_parameters, 12))) {
+				if((command_result = receive_response(&client_ctx, OP_GET_DATA, NULL, received_parameters, 9))) {
 					LOG_ERROR("Error receiving OP_GET_DATA response. (%s)", get_comm_status_text(command_result));
 					close(client_ctx.socket_fd);
 					break;
@@ -248,17 +248,14 @@ int main(int argc, char **argv) {
 				
 				conversion_result += sscanf(received_parameters[3], "%lf", &power_data_aux.v[0]);
 				conversion_result += sscanf(received_parameters[4], "%lf", &power_data_aux.v[1]);
-				conversion_result += sscanf(received_parameters[5], "%lf", &power_data_aux.v[2]);
 				
 				conversion_result += sscanf(received_parameters[6], "%lf", &power_data_aux.i[0]);
 				conversion_result += sscanf(received_parameters[7], "%lf", &power_data_aux.i[1]);
-				conversion_result += sscanf(received_parameters[8], "%lf", &power_data_aux.i[2]);
 				
 				conversion_result += sscanf(received_parameters[9], "%lf", &power_data_aux.p[0]);
 				conversion_result += sscanf(received_parameters[10], "%lf", &power_data_aux.p[1]);
-				conversion_result += sscanf(received_parameters[11], "%lf", &power_data_aux.p[2]);
 				
-				if(conversion_result == 10) {
+				if(conversion_result == 7) {
 					if(power_data_buffer_count && power_data_aux.timestamp <= power_data_buffer[(power_data_buffer_pos) ? (power_data_buffer_pos - 1) : (POWER_DATA_BUFFER_SIZE - 1)].timestamp)
 						continue;
 					

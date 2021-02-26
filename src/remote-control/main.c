@@ -138,42 +138,36 @@ int action_fw_update(comm_client_ctx *client_ctx, FILE *fd) {
 	return 0;
 }
 
-int print_power_data(const char *v1, const char *v2, const char *v3, const char *i1, const char *i2, const char *i3, const char *p1, const char *p2, const char *p3) {
+int print_power_data(const char *v1, const char *v2, const char *i1, const char *i2, const char *p1, const char *p2) {
 	int result = 0;
 	
-	float v[3];
-	float i[3];
-	float p[3];
-	float s[3];
-	float q[3];
+	float v[2];
+	float i[2];
+	float p[2];
+	float s[2];
+	float q[2];
 	
 	result += sscanf(v1, "%f", &v[0]);
 	result += sscanf(v2, "%f", &v[1]);
-	result += sscanf(v3, "%f", &v[2]);
 	
 	result += sscanf(i1, "%f", &i[0]);
 	result += sscanf(i2, "%f", &i[1]);
-	result += sscanf(i3, "%f", &i[2]);
 	
 	result += sscanf(p1, "%f", &p[0]);
 	result += sscanf(p2, "%f", &p[1]);
-	result += sscanf(p3, "%f", &p[2]);
 	
-	if(result != 9)
+	if(result != 6)
 		return 1;
 	
 	s[0] = v[0] * i[0];
 	s[1] = v[1] * i[1];
-	s[2] = v[2] * i[2];
 	
 	q[0] = sqrtf(powf(s[0], 2) - powf(p[0], 2));
 	q[1] = sqrtf(powf(s[1], 2) - powf(p[1], 2));
-	q[2] = sqrtf(powf(s[2], 2) - powf(p[2], 2));
 	
 	printf("A:  %5.1f V | %7.3f I | %7.1f W | %7.1f VA | %7.1f VAr | PF %5.2f\n", v[0], i[0], p[0], s[0], q[0], p[0] / s[0]);
 	printf("B:  %5.1f V | %7.3f I | %7.1f W | %7.1f VA | %7.1f VAr | PF %5.2f\n", v[1], i[1], p[1], s[1], q[1], p[1] / s[1]);
-	printf("C:  %5.1f V | %7.3f I | %7.1f W | %7.1f VA | %7.1f VAr | PF %5.2f\n", v[2], i[2], p[2], s[2], q[2], p[2] / s[2]);
-	printf("Total:                    %7.1f W | %7.1f VA | %7.1f VAr |\n", p[0] + p[1] + p[2], s[0] + s[1] + s[2], q[0] + q[1] + q[2]);
+	printf("Total:                    %7.1f W | %7.1f VA | %7.1f VAr |\n", p[0] + p[1], s[0] + s[1], q[0] + q[1]);
 	
 	return 0;
 }
@@ -370,7 +364,7 @@ int main(int argc, char **argv) {
 			}
 			
 			for(int i = 0; i < aux_qty; i++) {
-				if((command_result = receive_response(&client_ctx, OP_GET_DATA, NULL, received_parameters, (is_event ? 2 : 12)))) {
+				if((command_result = receive_response(&client_ctx, OP_GET_DATA, NULL, received_parameters, (is_event ? 2 : 9)))) {
 					fprintf(stderr, "Error receiving OP_GET_DATA response: %s\n", get_comm_status_text(command_result));
 					close(client_ctx.socket_fd);
 					break;
@@ -388,7 +382,7 @@ int main(int argc, char **argv) {
 				} else {
 					printf("Samples: %s\n", received_parameters[1]);
 					printf("Duration: %s us\n", received_parameters[2]);
-					print_power_data(received_parameters[3], received_parameters[4], received_parameters[5], received_parameters[6], received_parameters[7], received_parameters[8], received_parameters[9], received_parameters[10], received_parameters[11]);
+					print_power_data(received_parameters[3], received_parameters[4], received_parameters[5], received_parameters[6], received_parameters[7], received_parameters[8]);
 				}
 			}
 			

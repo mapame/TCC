@@ -19,13 +19,13 @@
 #define COMM_PORT 2048
 #define POWER_DATA_BUFFER_SIZE 24 * 3600
 
-#define POWER_DATA_STORAGE_IFMT "%li,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf\n"
-#define POWER_DATA_STORAGE_OFMT "%li,%.4lf,%.4lf,%.4lf,%.4lf,%.4lf,%.4lf,%.4lf,%.4lf,%.4lf\n"
+#define POWER_DATA_STORAGE_IFMT "%li,%lf,%lf,%lf,%lf,%lf,%lf\n"
+#define POWER_DATA_STORAGE_OFMT "%li,%.4lf,%.4lf,%.4lf,%.4lf,%.4lf,%.4lf\n"
 #define POWER_DATA_STORAGE_ARGS(var)	var.timestamp,\
-										var.v[0], var.v[1], var.v[2],\
-										var.i[0], var.i[1], var.i[2],\
-										var.p[0], var.p[1], var.p[2]
-#define POWER_DATA_STORAGE_ARG_QTY 10
+										var.v[0], var.v[1],\
+										var.i[0], var.i[1],\
+										var.p[0], var.p[1]
+#define POWER_DATA_STORAGE_ARG_QTY 7
 
 
 pthread_mutex_t power_data_buffer_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -71,11 +71,9 @@ static int import_power_data_file(const char *filename, time_t timestamp_limit) 
 		
 		pd_aux.s[0] = pd_aux.v[0] * pd_aux.i[0];
 		pd_aux.s[1] = pd_aux.v[1] * pd_aux.i[1];
-		pd_aux.s[2] = pd_aux.v[2] * pd_aux.i[2];
 		
 		pd_aux.q[0] = sqrtf(powf(pd_aux.s[0], 2) - powf(pd_aux.p[0], 2));
 		pd_aux.q[1] = sqrtf(powf(pd_aux.s[1], 2) - powf(pd_aux.p[1], 2));
-		pd_aux.q[2] = sqrtf(powf(pd_aux.s[2], 2) - powf(pd_aux.p[2], 2));
 		
 		memcpy(&power_data_buffer[power_data_buffer_pos], &pd_aux, sizeof(power_data_t));
 		
@@ -223,7 +221,7 @@ void *data_acquisition_loop(void *argp) {
 			}
 			
 			for(int i = 0; i < qty; i++) {
-				if((result = receive_response(&client_ctx, OP_GET_DATA, NULL, received_parameters, 12))) {
+				if((result = receive_response(&client_ctx, OP_GET_DATA, NULL, received_parameters, 9))) {
 					LOG_ERROR("Error receiving OP_GET_DATA response. (%s)", get_comm_status_text(result));
 					close(client_ctx.socket_fd);
 					break;
@@ -233,25 +231,20 @@ void *data_acquisition_loop(void *argp) {
 				result = sscanf(received_parameters[0], "%li", &pd_aux.timestamp);
 				result += sscanf(received_parameters[3], "%lf", &pd_aux.v[0]);
 				result += sscanf(received_parameters[4], "%lf", &pd_aux.v[1]);
-				result += sscanf(received_parameters[5], "%lf", &pd_aux.v[2]);
 				result += sscanf(received_parameters[6], "%lf", &pd_aux.i[0]);
 				result += sscanf(received_parameters[7], "%lf", &pd_aux.i[1]);
-				result += sscanf(received_parameters[8], "%lf", &pd_aux.i[2]);
 				result += sscanf(received_parameters[9], "%lf", &pd_aux.p[0]);
 				result += sscanf(received_parameters[10], "%lf", &pd_aux.p[1]);
-				result += sscanf(received_parameters[11], "%lf", &pd_aux.p[2]);
 				
-				if(result == 10) {
+				if(result == 7) {
 					if(pd_aux.timestamp <= last_loaded_timestamp)
 						continue;
 					
 					pd_aux.s[0] = pd_aux.v[0] * pd_aux.i[0];
 					pd_aux.s[1] = pd_aux.v[1] * pd_aux.i[1];
-					pd_aux.s[2] = pd_aux.v[2] * pd_aux.i[2];
 					
 					pd_aux.q[0] = sqrtf(powf(pd_aux.s[0], 2) - powf(pd_aux.p[0], 2));
 					pd_aux.q[1] = sqrtf(powf(pd_aux.s[1], 2) - powf(pd_aux.p[1], 2));
-					pd_aux.q[2] = sqrtf(powf(pd_aux.s[2], 2) - powf(pd_aux.p[2], 2));
 					
 					last_loaded_timestamp = pd_aux.timestamp;
 					
