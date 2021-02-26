@@ -306,6 +306,7 @@ int main(int argc, char **argv) {
 			
 			printf("Sampling state: %s (%s)\n", (received_parameters[0][0] == '0') ? "PAUSED" : "RUNNING", received_parameters[0]);
 			printf("RTC time: %s (%s)\n", aux_str, received_parameters[1]);
+			printf("RTC time diff: %ld secs\n", aux_time - time(NULL));
 			printf("Event count: %s\n", received_parameters[2]);
 			printf("Power data count: %s\n", received_parameters[3]);
 			
