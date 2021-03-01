@@ -15,6 +15,9 @@
 #include "configs.h"
 #include "communication.h"
 #include "power_data.h"
+#include "energy.h"
+#include "device_events.h"
+#include "database.h"
 
 #define COMM_PORT 2048
 #define POWER_DATA_BUFFER_SIZE 24 * 3600
@@ -26,6 +29,8 @@
 										var.i[0], var.i[1],\
 										var.p[0], var.p[1]
 #define POWER_DATA_STORAGE_ARG_QTY 7
+
+#define MAX_EVENT_FETCH_QTY 10
 
 
 pthread_mutex_t power_data_buffer_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -136,6 +141,7 @@ void *data_acquisition_loop(void *argp) {
 	FILE *pd_file = NULL;
 	
 	load_saved_power_data();
+	// TODO: Try to store last loaded power data entry
 	
 	generate_pd_filename(time(NULL), pd_filename, sizeof(pd_filename));
 	pd_file = fopen(pd_filename, "a");
@@ -159,9 +165,11 @@ void *data_acquisition_loop(void *argp) {
 	while(!(*terminate)) {
 		char mac_key[32] = "";
 		char param_str[16];
-		power_data_t pd_aux;
 		char received_parameters[PARAM_MAX_QTY][PARAM_STR_SIZE];
-		int qty;
+		int received_qty;
+		int pd_qty, e_qty;
+		int repeated_counter;
+		power_data_t pd_aux;
 		
 		configs_get_value("device_mac_key", mac_key, sizeof(mac_key));
 		
@@ -177,6 +185,7 @@ void *data_acquisition_loop(void *argp) {
 		while(!(*terminate)) {
 			generate_pd_filename(time(NULL), new_pd_filename, sizeof(pd_filename));
 			
+			// TODO: mover a verificação para dentro do loop, usando o timestamp recebido
 			/* Quando o dia terminar, fecha o arquivo atual e cria um novo. */
 			if(strcmp(pd_filename, new_pd_filename)) {
 				LOG_INFO("Changing to new file \"%s\".", new_pd_filename);
@@ -185,7 +194,7 @@ void *data_acquisition_loop(void *argp) {
 				
 				pd_file = fopen(new_pd_filename, "w");
 				if(pd_file == NULL) {
-					LOG_ERROR("Failed to create new power data file \"%s\": %s", new_pd_filename, strerror(errno));
+					LOG_FATAL("Failed to create new power data file \"%s\": %s", new_pd_filename, strerror(errno));
 					*terminate = 1;
 					kill(getpid(), SIGTERM);
 					break;
@@ -196,49 +205,54 @@ void *data_acquisition_loop(void *argp) {
 			
 			if((result = send_comand_and_receive_response(&client_ctx, OP_QUERY_STATUS, "A\t", received_parameters, 4))) {
 				LOG_ERROR("Error sending OP_QUERY_STATUS command. (%s)", get_comm_status_text(result));
-				close(client_ctx.socket_fd);
 				break;
 			}
 			
 			if(*received_parameters[0] == '0') {
 				if((result = send_comand_and_receive_response(&client_ctx, OP_SAMPLING_START, NULL, NULL, 0))) {
 					LOG_ERROR("Error sending OP_SAMPLING_START command. (%s)", get_comm_status_text(result));
-					close(client_ctx.socket_fd);
 				}
 			}
 			
-			sscanf(received_parameters[3], "%u", &qty);
+			e_qty = pd_qty = 0;
+			sscanf(received_parameters[2], "%d", &e_qty);
+			sscanf(received_parameters[3], "%d", &pd_qty);
 			
-			if(qty == 0)
+			if(pd_qty == 0) {
+				usleep(500000);
 				continue;
+			}
 			
-			sprintf(param_str, "P\t%u\t", qty);
+			sprintf(param_str, "P\t%u\t", pd_qty);
 			
 			if((result = send_command(&client_ctx, OP_GET_DATA, param_str))) {
 				LOG_ERROR("Error sending OP_GET_DATA command. (%s)", get_comm_status_text(result));
-				close(client_ctx.socket_fd);
 				break;
 			}
 			
-			for(int i = 0; i < qty; i++) {
+			repeated_counter = 0;
+			
+			for(received_qty = 0; received_qty < pd_qty; received_qty++) {
 				if((result = receive_response(&client_ctx, OP_GET_DATA, NULL, received_parameters, 9))) {
 					LOG_ERROR("Error receiving OP_GET_DATA response. (%s)", get_comm_status_text(result));
-					close(client_ctx.socket_fd);
 					break;
 				}
+				
 				memset(&pd_aux, 0, sizeof(power_data_t));
 				
 				result = sscanf(received_parameters[0], "%li", &pd_aux.timestamp);
 				result += sscanf(received_parameters[3], "%lf", &pd_aux.v[0]);
 				result += sscanf(received_parameters[4], "%lf", &pd_aux.v[1]);
-				result += sscanf(received_parameters[6], "%lf", &pd_aux.i[0]);
-				result += sscanf(received_parameters[7], "%lf", &pd_aux.i[1]);
-				result += sscanf(received_parameters[9], "%lf", &pd_aux.p[0]);
-				result += sscanf(received_parameters[10], "%lf", &pd_aux.p[1]);
+				result += sscanf(received_parameters[5], "%lf", &pd_aux.i[0]);
+				result += sscanf(received_parameters[6], "%lf", &pd_aux.i[1]);
+				result += sscanf(received_parameters[7], "%lf", &pd_aux.p[0]);
+				result += sscanf(received_parameters[8], "%lf", &pd_aux.p[1]);
 				
 				if(result == 7) {
-					if(pd_aux.timestamp <= last_loaded_timestamp)
+					if(pd_aux.timestamp <= last_loaded_timestamp) {
+						repeated_counter++;
 						continue;
+					}
 					
 					pd_aux.s[0] = pd_aux.v[0] * pd_aux.i[0];
 					pd_aux.s[1] = pd_aux.v[1] * pd_aux.i[1];
@@ -261,6 +275,10 @@ void *data_acquisition_loop(void *argp) {
 						power_data_buffer_count++;
 					
 					pthread_mutex_unlock(&power_data_buffer_mutex);
+					
+					energy_add_power(&pd_aux);
+				} else {
+					LOG_ERROR("Failed to parse power data response from device.");
 				}
 			}
 			
@@ -268,14 +286,58 @@ void *data_acquisition_loop(void *argp) {
 			
 			client_ctx.counter++;
 			
+			if(received_qty < pd_qty)
+				break;
+			
+			if(repeated_counter)
+				LOG_WARN("Received %d repeated power data entries.", repeated_counter);
+			
 			if((result = send_comand_and_receive_response(&client_ctx, OP_DELETE_DATA, param_str, NULL, 0))) {
 				LOG_ERROR("Error sending OP_DELETE_DATA command. (%s)", get_comm_status_text(result));
-				close(client_ctx.socket_fd);
 				break;
+			}
+			
+			if(e_qty) {
+				time_t e_timestamp;
+				
+				if(e_qty > MAX_EVENT_FETCH_QTY)
+					e_qty = MAX_EVENT_FETCH_QTY;
+				
+				sprintf(param_str, "E\t%u\t", e_qty);
+				
+				if((result = send_command(&client_ctx, OP_GET_DATA, param_str))) {
+					LOG_ERROR("Error sending OP_GET_DATA command. (%s)", get_comm_status_text(result));
+					break;
+				}
+				
+				for(received_qty = 0; received_qty < e_qty; received_qty++) {
+					if((result = receive_response(&client_ctx, OP_GET_DATA, NULL, received_parameters, 2))) {
+						LOG_ERROR("Error receiving OP_GET_DATA response. (%s)", get_comm_status_text(result));
+						break;
+					}
+					
+					if(sscanf(received_parameters[0], "%li", &e_timestamp) == 1 && strlen(received_parameters[1]) > 0) {
+						store_device_event_db(e_timestamp, received_parameters[1]);
+					} else {
+						LOG_WARN("Failed to parse event response from device.");
+					}
+				}
+				
+				client_ctx.counter++;
+				
+				if(received_qty < e_qty)
+					break;
+				
+				if((result = send_comand_and_receive_response(&client_ctx, OP_DELETE_DATA, param_str, NULL, 0))) {
+					LOG_ERROR("Error sending OP_DELETE_DATA command. (%s)", get_comm_status_text(result));
+					break;
+				}
 			}
 			
 			sleep(1);
 		}
+		
+		close(client_ctx.socket_fd);
 	}
 	
 	fclose(pd_file);
