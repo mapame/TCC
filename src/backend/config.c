@@ -7,7 +7,7 @@
 #include "database.h"
 #include "logger.h"
 
-struct json_object *configs_get_json() {
+struct json_object *config_get_list_json() {
 	int result;
 	sqlite3 *db_conn = NULL;
 	sqlite3_stmt *ppstmt = NULL;
@@ -66,7 +66,7 @@ struct json_object *configs_get_json() {
 	return config_list;
 }
 
-int configs_get_value(const char *name, char *value_buf, size_t buf_size) {
+int config_get_value(const char *name, char *value_buf, size_t buf_size) {
 	int result;
 	sqlite3 *db_conn = NULL;
 	sqlite3_stmt *ppstmt = NULL;
@@ -127,11 +127,11 @@ int configs_get_value(const char *name, char *value_buf, size_t buf_size) {
 	return len;
 }
 
-int configs_get_value_int(const char *name, int min, int max, int default_value) {
+int config_get_value_int(const char *name, int min, int max, int default_value) {
 	char buf[50];
 	int value;
 	
-	if(configs_get_value(name, buf, sizeof(buf)))
+	if(config_get_value(name, buf, sizeof(buf)))
 		return default_value;
 	
 	if(sscanf(buf, "%d", &value) != 1)
@@ -145,11 +145,11 @@ int configs_get_value_int(const char *name, int min, int max, int default_value)
 	return value;
 }
 
-float configs_get_value_float(const char *name, float min, float max, float default_value) {
+float config_get_value_float(const char *name, float min, float max, float default_value) {
 	char buf[50];
 	float value;
 	
-	if(configs_get_value(name, buf, sizeof(buf)))
+	if(config_get_value(name, buf, sizeof(buf)))
 		return default_value;
 	
 	if(sscanf(buf, "%f", &value) != 1)

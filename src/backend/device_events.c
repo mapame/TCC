@@ -5,7 +5,6 @@
 
 #include "common.h"
 #include "logger.h"
-#include "configs.h"
 #include "database.h"
 
 int store_device_event_db(time_t timestamp, const char *description) {

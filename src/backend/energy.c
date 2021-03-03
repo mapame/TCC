@@ -6,7 +6,6 @@
 
 #include "common.h"
 #include "logger.h"
-#include "configs.h"
 #include "power.h"
 #include "database.h"
 

@@ -12,7 +12,7 @@
 
 #include "common.h"
 #include "logger.h"
-#include "configs.h"
+#include "config.h"
 #include "communication.h"
 #include "power.h"
 #include "energy.h"
@@ -171,7 +171,7 @@ void *data_acquisition_loop(void *argp) {
 		int repeated_counter;
 		power_data_t pd_aux;
 		
-		configs_get_value("device_mac_key", mac_key, sizeof(mac_key));
+		config_get_value("device_mac_key", mac_key, sizeof(mac_key));
 		
 		if(comm_accept_client(main_socket, &client_ctx, mac_key) < 0) {
 			LOG_ERROR("Failed to accept new client connection.");

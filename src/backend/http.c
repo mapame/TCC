@@ -9,7 +9,7 @@
 #include "logger.h"
 
 #include "http_auth.h"
-#include "http_configs.h"
+#include "http_config.h"
 
 #define CONNECTION_LIMIT 200
 #define CONNECTION_TIMEOUT 5
@@ -32,7 +32,6 @@ static const http_url_handler_t http_url_handler_list[] = {
 	{"", NULL, NULL, NULL, NULL, NULL},
 	{"/auth", NULL, url_handler_auth_check, url_handler_auth_check, NULL, NULL},
 	{"/auth/login", NULL, NULL, url_handler_auth_login_post, NULL},
-	{"/configs", NULL, url_handler_config_list, NULL, NULL}
 };
 
 #if (MHD_VERSION < 0x00097002)
