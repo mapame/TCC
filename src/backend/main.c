@@ -12,6 +12,7 @@
 #include "logger.h"
 #include "database.h"
 #include "http.h"
+#include "power.h"
 
 void *data_acquisition_loop(void *argp);
 
@@ -88,6 +89,8 @@ int main(int argc, char **argv) {
 	 * criadas a partir de agora vão herdar esse bloqueio. */
 	pthread_sigmask(SIG_BLOCK, &signal_set, NULL);
 	
+	load_saved_power_data();
+	
 	LOG_INFO("Starting data acquisition thread.");
 	pthread_create(&data_acquisition_thread, NULL, data_acquisition_loop, (void*) &terminate);
 	
@@ -102,6 +105,8 @@ int main(int argc, char **argv) {
 	http_stop(httpd);
 	
 	pthread_join(data_acquisition_thread, NULL);
+	
+	close_power_data_file();
 	
 	return 0;
 }

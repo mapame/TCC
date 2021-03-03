@@ -12,4 +12,8 @@ typedef struct power_data_s {
 	double q[2];
 } power_data_t;
 
+int load_saved_power_data();
+void close_power_data_file();
+int store_power_data(power_data_t *pd_ptr);
+
 #endif
