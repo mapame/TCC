@@ -118,7 +118,7 @@ int comm_accept_client(int main_socket_fd, comm_client_ctx *ctx, const char *hma
 	ctx->counter = 0;
 	
 	if((result = send_comand_and_receive_response(ctx, OP_PROTOCOL_START, NULL, received_parameters, 1))) {
-		LOG_ERROR("Error sending OP_PROTOCOL_START command: %s\n", get_comm_status_text(result));
+		LOG_ERROR("Error sending OP_PROTOCOL_START command: %s", get_comm_status_text(result));
 		shutdown(ctx->socket_fd, SHUT_RDWR);
 		close(ctx->socket_fd);
 		ctx->socket_fd = -1;
