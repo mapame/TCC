@@ -14,7 +14,7 @@
 #include "logger.h"
 #include "configs.h"
 #include "communication.h"
-#include "power_data.h"
+#include "power.h"
 #include "energy.h"
 #include "device_events.h"
 #include "database.h"

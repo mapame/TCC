@@ -7,7 +7,7 @@
 #include "common.h"
 #include "logger.h"
 #include "configs.h"
-#include "power_data.h"
+#include "power.h"
 #include "database.h"
 
 int energy_add_power(power_data_t *pd) {

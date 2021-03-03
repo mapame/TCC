@@ -1,3 +1,6 @@
+#ifndef POWER_DATA_H
+#define POWER_DATA_H
+
 #include <time.h>
 
 typedef struct power_data_s {
@@ -8,3 +11,5 @@ typedef struct power_data_s {
 	double s[2];
 	double q[2];
 } power_data_t;
+
+#endif
