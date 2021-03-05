@@ -19,6 +19,7 @@
 
 #define COMM_PORT 2048
 
+#define MAX_POWER_FETCH_QTY 30
 #define MAX_EVENT_FETCH_QTY 10
 
 
@@ -73,6 +74,12 @@ void *data_acquisition_loop(void *argp) {
 			e_qty = pd_qty = 0;
 			sscanf(received_parameters[2], "%d", &e_qty);
 			sscanf(received_parameters[3], "%d", &pd_qty);
+			
+			if(pd_qty > MAX_POWER_FETCH_QTY)
+				pd_qty = MAX_POWER_FETCH_QTY;
+			
+			if(e_qty > MAX_EVENT_FETCH_QTY)
+				e_qty = MAX_EVENT_FETCH_QTY;
 			
 			if(pd_qty == 0) {
 				usleep(500000);
@@ -139,9 +146,6 @@ void *data_acquisition_loop(void *argp) {
 			
 			if(e_qty) {
 				time_t e_timestamp;
-				
-				if(e_qty > MAX_EVENT_FETCH_QTY)
-					e_qty = MAX_EVENT_FETCH_QTY;
 				
 				sprintf(param_str, "E\t%u\t", e_qty);
 				
