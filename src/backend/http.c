@@ -37,15 +37,13 @@ static const http_url_handler_t http_url_handler_list[] = {
 #if (MHD_VERSION < 0x00097002)
 static int
 #else
-static enum 
+static enum MHD_Result
 #endif
-MHD_Result http_handler(void *cls,
-						struct MHD_Connection *connection,
+http_handler(void *cls, struct MHD_Connection *connection,
 						const char *url,
 						const char *method,
 						const char *version,
-						const char *upload_data,
-						size_t *upload_data_size,
+						const char *upload_data, size_t *upload_data_size,
 						void **con_cls) {
 	
 	http_req_ctx_t *req_context;
