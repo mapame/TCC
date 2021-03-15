@@ -112,8 +112,6 @@ int energy_add_power(power_data_t *pd) {
 									" ON CONFLICT(year,month,day,hour) DO UPDATE SET second_count = second_count + 1, active = active + excluded.active, reactive = reactive + excluded.reactive, min_p = min(min_p, excluded.min_p), cost = cost + excluded.cost;";
 	const char sql_store_day[] = "INSERT INTO energy_days(year,month,day,active,reactive,min_p,cost) VALUES(?1,?2,?3,?4,?5,?6,?7)"
 									" ON CONFLICT(year,month,day) DO UPDATE SET second_count = second_count + 1, active = active + excluded.active, reactive = reactive + excluded.reactive, min_p = min(min_p, excluded.min_p), cost = cost + excluded.cost;";
-	const char sql_store_month[] = "INSERT INTO energy_months(year,month,active,reactive,min_p,cost) VALUES(?1,?2,?3,?4,?5,?6)"
-									" ON CONFLICT(year,month) DO UPDATE SET second_count = second_count + 1, active = active + excluded.active, reactive = reactive + excluded.reactive, min_p = min(min_p, excluded.min_p), cost = cost + excluded.cost;";
 	time_t timestamp_minute;
 	struct tm time_tm;
 	int year, month, day, hour;
@@ -268,43 +266,6 @@ int energy_add_power(power_data_t *pd) {
 	
 	if(result != SQLITE_DONE) {
 		LOG_ERROR("Failed to store power data as day: %s", sqlite3_errstr(result));
-		sqlite3_close(db_conn);
-		
-		return -1;
-	}
-	
-	/*
-	 * Mês
-	 */
-	if((result = sqlite3_prepare_v2(db_conn, sql_store_month, -1, &ppstmt, NULL)) != SQLITE_OK) {
-		LOG_ERROR("Failed to prepare the SQL statement for month power data storage: %s", sqlite3_errstr(result));
-		sqlite3_close(db_conn);
-		
-		return -1;
-	}
-	
-	// SQLITE_OK é zero, então somando todos os resultados podemos saber se algum falhou
-	result = sqlite3_bind_int(ppstmt, 1, year);
-	result += sqlite3_bind_int(ppstmt, 2, month);
-	result += sqlite3_bind_double(ppstmt, 3, active_energy_total);
-	result += sqlite3_bind_double(ppstmt, 4, reactive_energy_total);
-	result += sqlite3_bind_double(ppstmt, 5, p_total);
-	result += sqlite3_bind_double(ppstmt, 6, cost);
-	
-	if(result) {
-		LOG_ERROR("Failed to bind value to prepared statement.");
-		sqlite3_finalize(ppstmt);
-		sqlite3_close(db_conn);
-		
-		return -1;
-	}
-	
-	result = sqlite3_step(ppstmt);
-	
-	sqlite3_finalize(ppstmt);
-	
-	if(result != SQLITE_DONE) {
-		LOG_ERROR("Failed to store power data as month: %s", sqlite3_errstr(result));
 		sqlite3_close(db_conn);
 		
 		return -1;
