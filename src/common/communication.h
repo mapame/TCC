@@ -48,7 +48,7 @@ typedef struct comm_client_ctx_s {
 
 const char * get_comm_status_text(comm_status_t status);
 int comm_create_main_socket(int reuse_addr);
-int comm_accept_client(int main_socket_fd, comm_client_ctx *ctx, const char *hmac_key);
+int comm_accept_client(int main_socket_fd, comm_client_ctx *ctx, const char *hmac_key, int *terminate);
 int send_command(comm_client_ctx *client_ctx, int op, const char *parameters);
 int receive_response(comm_client_ctx *client_ctx, int op, int *response_code, char response_parameters[][PARAM_STR_SIZE], unsigned int expected_parameter_qty);
 int send_comand_and_receive_response(comm_client_ctx *client_ctx, int op, const char *command_parameters, char response_parameters[][PARAM_STR_SIZE], unsigned int expected_parameter_qty);

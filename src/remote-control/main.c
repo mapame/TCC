@@ -225,7 +225,7 @@ int main(int argc, char **argv) {
 	
 	printf("Waiting for device connection on port %d...\n", COMM_SERVER_PORT);
 	
-	if(comm_accept_client(main_socket, &client_ctx, argv[1]) < 0) {
+	if(comm_accept_client(main_socket, &client_ctx, argv[1], NULL) < 0) {
 		fprintf(stderr, "Failed to accept new client connection.\n");
 		return -1;
 	}

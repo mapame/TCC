@@ -3,6 +3,7 @@
 #include <string.h>
 #include <bsd/string.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <stdint.h>
 #include <time.h>
 
@@ -61,11 +62,22 @@ const char * get_comm_status_text(comm_status_t status) {
 
 int comm_create_main_socket(int reuse_addr) {
 	int socket_fd;
+	int flags;
 	struct sockaddr_in bind_addr;
 	
 	socket_fd = socket(PF_INET, SOCK_STREAM, 0);
 	if(socket_fd < 0) {
 		LOG_ERROR("Failed to create main socket.\n");
+		return -1;
+	}
+	
+	if((flags = fcntl(socket_fd, F_GETFL, 0)) < 0) {
+		LOG_ERROR("Failed read socket flags.\n");
+		return -1;
+	}
+	
+	if(fcntl(socket_fd, F_SETFL, flags | O_NONBLOCK) < 0) {
+		LOG_ERROR("Failed set O_NONBLOCK flag.\n");
 		return -1;
 	}
 	
@@ -90,7 +102,7 @@ int comm_create_main_socket(int reuse_addr) {
 	return socket_fd;
 }
 
-int comm_accept_client(int main_socket_fd, comm_client_ctx *ctx, const char *hmac_key) {
+int comm_accept_client(int main_socket_fd, comm_client_ctx *ctx, const char *hmac_key, int *terminate) {
 	unsigned int addr_size = sizeof(struct sockaddr_in);
 	struct timeval rcv_timeout_value = {.tv_sec = 2, .tv_usec = 0};
 	int result;
@@ -102,12 +114,19 @@ int comm_accept_client(int main_socket_fd, comm_client_ctx *ctx, const char *hma
 	if(ctx == NULL || hmac_key == NULL)
 		return -2;
 	
-	ctx->socket_fd = accept(main_socket_fd, (struct sockaddr *) &(ctx->address), &addr_size);
-	
-	if(ctx->socket_fd < 0) {
-		LOG_ERROR("Failed to accept new client connection.");
-		return -3;
-	}
+	do {
+		ctx->socket_fd = accept(main_socket_fd, (struct sockaddr *) &(ctx->address), &addr_size);
+		
+		if(terminate && *terminate)
+			return 0;
+		
+		if(ctx->socket_fd < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+			LOG_ERROR("Failed to accept new client connection.");
+			return -3;
+		}
+		
+		usleep(500000);
+	} while(ctx->socket_fd < 0);
 	
 	if(setsockopt(ctx->socket_fd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&rcv_timeout_value, sizeof(rcv_timeout_value)) < 0)
 		LOG_WARN("Failed to set receive timeout to client socket.");

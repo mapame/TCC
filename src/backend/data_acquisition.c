@@ -50,14 +50,16 @@ void *data_acquisition_loop(void *argp) {
 		
 		config_get_value("device_mac_key", mac_key, sizeof(mac_key));
 		
-		if(comm_accept_client(main_socket, &client_ctx, mac_key) < 0) {
+		if(comm_accept_client(main_socket, &client_ctx, mac_key, terminate) < 0) {
 			LOG_ERROR("Failed to accept new client connection.");
 			sleep(1);
 			continue;
 		}
 		
-		LOG_INFO("Received connection from %s", inet_ntoa(client_ctx.address.sin_addr));
-		LOG_INFO("Device firmware version: %s", client_ctx.version);
+		if(*terminate == 0) {
+			LOG_INFO("Received connection from %s", inet_ntoa(client_ctx.address.sin_addr));
+			LOG_INFO("Device firmware version: %s", client_ctx.version);
+		}
 		
 		while(!(*terminate)) {
 			if((result = send_comand_and_receive_response(&client_ctx, OP_QUERY_STATUS, "A\t", received_parameters, 4))) {
@@ -66,6 +68,8 @@ void *data_acquisition_loop(void *argp) {
 			}
 			
 			if(*received_parameters[0] == '0') {
+				LOG_INFO("Sampling is paused, restarting.");
+				
 				if((result = send_comand_and_receive_response(&client_ctx, OP_SAMPLING_START, NULL, NULL, 0))) {
 					LOG_ERROR("Error sending OP_SAMPLING_START command. (%s)", get_comm_status_text(result));
 				}

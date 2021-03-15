@@ -131,7 +131,7 @@ int main(int argc, char **argv) {
 		int conversion_result;
 		int qty;
 		
-		if(comm_accept_client(main_socket, &client_ctx, mac_key) < 0) {
+		if(comm_accept_client(main_socket, &client_ctx, mac_key, terminate) < 0) {
 			LOG_ERROR("Failed to accept new client connection.");
 			continue;
 		}
