@@ -131,7 +131,7 @@ int config_get_value_int(const char *name, int min, int max, int default_value) 
 	char buf[50];
 	int value;
 	
-	if(config_get_value(name, buf, sizeof(buf)))
+	if(config_get_value(name, buf, sizeof(buf)) <= 0)
 		return default_value;
 	
 	if(sscanf(buf, "%d", &value) != 1)
@@ -149,7 +149,7 @@ float config_get_value_float(const char *name, float min, float max, float defau
 	char buf[50];
 	float value;
 	
-	if(config_get_value(name, buf, sizeof(buf)))
+	if(config_get_value(name, buf, sizeof(buf)) <= 0)
 		return default_value;
 	
 	if(sscanf(buf, "%f", &value) != 1)
