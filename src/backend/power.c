@@ -198,3 +198,37 @@ int store_power_data(power_data_t *pd_ptr) {
 	
 	return 0;
 }
+
+int get_power_data(time_t timestamp_start, time_t timestamp_end, power_data_t *buffer, int buffer_len) {
+	int pos;
+	int output_count = 0;
+	
+	if(buffer == NULL)
+		return -1;
+	
+	if(buffer_len == 0 || (timestamp_end > 0 && timestamp_end < timestamp_start))
+		return 0;
+	
+	if(pthread_mutex_lock(&power_data_mutex))
+		return -2;
+	
+	pos = (power_data_buffer_count < POWER_DATA_BUFFER_SIZE) ? 0 : power_data_buffer_pos;
+	
+	for(int count = 0; (count < power_data_buffer_count && output_count < buffer_len); count++) {
+		
+		if(timestamp_end > 0 && power_data_buffer[pos].timestamp > timestamp_end)
+			break;
+		
+		if(power_data_buffer[pos].timestamp >= timestamp_start) {
+			memcpy(&buffer[output_count], &power_data_buffer[pos], sizeof(power_data_t));
+			
+			output_count++;
+		}
+		
+		pos = (pos + 1) % POWER_DATA_BUFFER_SIZE;
+	}
+	
+	pthread_mutex_unlock(&power_data_mutex);
+	
+	return output_count;
+}
