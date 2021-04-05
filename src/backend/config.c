@@ -162,3 +162,21 @@ float config_get_value_float(const char *name, float min, float max, float defau
 	
 	return value;
 }
+
+double config_get_value_double(const char *name, double min, double max, double default_value) {
+	char buf[50];
+	double value;
+	
+	if(config_get_value(name, buf, sizeof(buf)) <= 0)
+		return default_value;
+	
+	if(sscanf(buf, "%lf", &value) != 1)
+		return default_value;
+	
+	if(value > max)
+		return max;
+	else if(value < min)
+		return min;
+	
+	return value;
+}
