@@ -10,18 +10,18 @@
 #include "logger.h"
 #include "power.h"
 
-#define POWER_DATA_BUFFER_SIZE 24 * 3600
+#define POWER_DATA_BUFFER_SIZE (24 * 3600)
 
-pthread_mutex_t power_data_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t power_data_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-time_t last_loaded_timestamp = 0;
+static time_t last_loaded_timestamp = 0;
 
-power_data_t power_data_buffer[POWER_DATA_BUFFER_SIZE];
-int power_data_buffer_pos = 0;
-int power_data_buffer_count = 0;
+static power_data_t power_data_buffer[POWER_DATA_BUFFER_SIZE];
+static int power_data_buffer_pos = 0;
+static int power_data_buffer_count = 0;
 
-FILE *open_pd_fd = NULL;
-char open_pd_filename[32];
+static FILE *open_pd_fd = NULL;
+static char open_pd_filename[32];
 
 static size_t generate_pd_filename(time_t time_epoch, char *buffer, size_t len) {
 	struct tm time_tm;
