@@ -4,7 +4,7 @@
 
 #include <microhttpd.h>
 
-#define DEFAULT_HTTP_PORT 8080
+#define DEFAULT_HTTP_PORT 8081
 #define JSON_CONTENT_TYPE "application/json"
 
 typedef unsigned int
