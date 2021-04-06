@@ -15,6 +15,7 @@
 #include "power.h"
 
 void *data_acquisition_loop(void *argp);
+void *disaggregation_loop(void *argp);
 
 int main(int argc, char **argv) {
 	sigset_t signal_set;
@@ -27,6 +28,7 @@ int main(int argc, char **argv) {
 	char *working_dir_path = NULL;
 	
 	pthread_t data_acquisition_thread;
+	pthread_t disaggregation_thread;
 	
 	struct MHD_Daemon *httpd;
 	
@@ -94,6 +96,9 @@ int main(int argc, char **argv) {
 	LOG_INFO("Starting data acquisition thread.");
 	pthread_create(&data_acquisition_thread, NULL, data_acquisition_loop, (void*) &terminate);
 	
+	LOG_INFO("Starting disaggregation thread.");
+	pthread_create(&disaggregation_thread, NULL, disaggregation_loop, (void*) &terminate);
+	
 	LOG_INFO("Starting HTTP server.");
 	httpd = http_init(http_port);
 	
@@ -105,6 +110,7 @@ int main(int argc, char **argv) {
 	http_stop(httpd);
 	
 	pthread_join(data_acquisition_thread, NULL);
+	pthread_join(disaggregation_thread, NULL);
 	
 	close_power_data_file();
 	
