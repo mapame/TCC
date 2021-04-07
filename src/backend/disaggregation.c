@@ -46,7 +46,7 @@ void *disaggregation_loop(void *argp) {
 	int *terminate = (int*) argp;
 	
 	int result;
-	double slope_threshold, steady_threshold;
+	double detection_threshold;
 	time_t last_timestamp = 0;
 	power_data_t pd_buffer[DISAGGREGATION_BUFFER_SIZE];
 	double ptotal_buffer[DISAGGREGATION_BUFFER_SIZE];
@@ -57,10 +57,9 @@ void *disaggregation_loop(void *argp) {
 	srand(time(NULL));
 	svm_set_print_string_function(&svm_print_string_f);
 	
-	slope_threshold = config_get_value_double("disaggregation_slope_threshold", 1, 50, 20);
-	steady_threshold = config_get_value_double("disaggregation_steady_threshold", 1, 100, 40);
+	detection_threshold = config_get_value_double("load_event_detection_threshold", 10, 100, 50);
 	
-	LOG_INFO("Load event detection thresholds: %.1lf W | %.1lf W", slope_threshold, steady_threshold);
+	LOG_INFO("Load event detection threshold: %.1lf W", detection_threshold);
 	
 	while(!(*terminate)) {
 		if((result = get_power_data(last_timestamp, 0, pd_buffer, DISAGGREGATION_BUFFER_SIZE)) != DISAGGREGATION_BUFFER_SIZE) {
@@ -83,13 +82,13 @@ void *disaggregation_loop(void *argp) {
 		if(time_gap > MAX_TIME_GAP)
 			continue;
 		
-		if(fabs(ptotal_buffer[1] - ptotal_buffer[0]) < (fabs(ptotal_buffer[3] - ptotal_buffer[1]) * 0.5) && fabs(ptotal_buffer[2] - ptotal_buffer[1]) > slope_threshold && fabs(ptotal_buffer[3] - ptotal_buffer[1]) > slope_threshold) {
+		if(fabs(ptotal_buffer[1] - ptotal_buffer[0]) < (fabs(ptotal_buffer[3] - ptotal_buffer[1]) * 0.5) && fabs(ptotal_buffer[2] - ptotal_buffer[1]) > (detection_threshold * 0.2) && fabs(ptotal_buffer[3] - ptotal_buffer[1]) > (detection_threshold * 0.2)) {
 			pavg_before = (ptotal_buffer[0] + ptotal_buffer[1]) / 2.0;
 			
 			for(int k = 3; k < DISAGGREGATION_BUFFER_SIZE - 2; k++) {
 				pavg_after = (ptotal_buffer[k] + ptotal_buffer[k + 1]) / 2.0;
 				
-				if(fabs(pavg_after - pavg_before) > steady_threshold && fabs(ptotal_buffer[k + 1] - ptotal_buffer[k]) < (fabs(ptotal_buffer[3] - ptotal_buffer[1]) * 0.5) && ((pavg_after - pavg_before) * (ptotal_buffer[3] - ptotal_buffer[1]) > 0.0)) {
+				if(fabs(pavg_after - pavg_before) > detection_threshold && fabs(ptotal_buffer[k + 1] - ptotal_buffer[k]) < (fabs(ptotal_buffer[3] - ptotal_buffer[1]) * 0.5) && ((pavg_after - pavg_before) * (ptotal_buffer[3] - ptotal_buffer[1]) > 0.0)) {
 					load_event.timestamp = pd_buffer[1].timestamp;
 					load_event.duration = k - 1;
 					load_event.delta_pt = (pavg_after - pavg_before);
