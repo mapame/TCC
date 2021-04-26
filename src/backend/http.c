@@ -50,6 +50,7 @@ http_handler(void *cls, struct MHD_Connection *connection,
 	const http_url_handler_t *handler = NULL;
 	struct MHD_Response *response;
 	unsigned int status = MHD_HTTP_OK;
+	int options_request = 0;
 	char *resp_content_type = NULL;
 	char *resp_data = NULL;
 	size_t resp_data_size = 0;
@@ -110,6 +111,8 @@ http_handler(void *cls, struct MHD_Connection *connection,
 			handler_f = handler->put_handler;
 		else if(strcmp(method, MHD_HTTP_METHOD_DELETE) == 0 && handler->delete_handler)
 			handler_f = handler->delete_handler;
+		else if(strcmp(method, MHD_HTTP_METHOD_OPTIONS) == 0)
+			options_request = 1;
 		else
 			status = MHD_HTTP_METHOD_NOT_ALLOWED;
 		
@@ -123,7 +126,7 @@ http_handler(void *cls, struct MHD_Connection *connection,
 	response = MHD_create_response_from_buffer(resp_data_size, resp_data, resp_data ? MHD_RESPMEM_MUST_FREE : MHD_RESPMEM_PERSISTENT);
 	
 	/* Se um método não suportado foi recebido, envia o cabeçalho "Allow" com os métodos permitidos pela URL */
-	if (status == MHD_HTTP_METHOD_NOT_ALLOWED) {
+	if (status == MHD_HTTP_METHOD_NOT_ALLOWED || options_request) {
 		char allow_str[32] = "\0";
 		
 		if (handler->get_handler)
@@ -161,6 +164,8 @@ http_handler(void *cls, struct MHD_Connection *connection,
 	
 	/* Adiciona cabeçalho para permitir acesso por outras origens */
 	MHD_add_response_header(response, "Access-Control-Allow-Origin", "*");
+	MHD_add_response_header(response, "Access-Control-Allow-Methods", "*");
+	MHD_add_response_header(response, "Access-Control-Allow-Headers", "*");
 	
 	result = MHD_queue_response(connection, status, response);
 	MHD_destroy_response(response);
