@@ -173,7 +173,7 @@ char *auth_new_session(int user_id) {
 	sqlite3 *db_conn = NULL;
 	sqlite3_stmt *ppstmt = NULL;
 	const char sql_insert_session[] = "INSERT INTO sessions (key,user_id,valid_thru) VALUES(?1,?2,?3);";
-	const char sql_delete_sessions[] = "DELETE FROM sessions WHERE user_id=?1 AND key NOT IN (SELECT key FROM sessions WHERE user_id=?1 ORDER BY valid_thru DESC LIMIT 3);";
+	const char sql_delete_sessions[] = "DELETE FROM sessions WHERE valid_thru < ?1 OR (user_id=?2 AND key NOT IN (SELECT key FROM sessions WHERE user_id=?2 ORDER BY valid_thru DESC LIMIT 3));";
 	uuid_t key_uuid;
 	char session_key[UUID_STR_LEN];
 	time_t session_valid_thru;
@@ -218,68 +218,33 @@ char *auth_new_session(int user_id) {
 	sqlite3_finalize(ppstmt);
 	
 	if(result != SQLITE_DONE) {
-		LOG_ERROR("Failed to create session: %s", sqlite3_errstr(result));
+		LOG_ERROR("Failed to create new user session: %s", sqlite3_errstr(result));
 		sqlite3_close(db_conn);
 		
 		return NULL;
 	}
 	
+	// Deleta as sessões expiradas e as sessões excedentes
 	if((result = sqlite3_prepare_v2(db_conn, sql_delete_sessions, -1, &ppstmt, NULL)) == SQLITE_OK) {
-		sqlite3_bind_int(ppstmt, 1, user_id);
 		
-		if((result = sqlite3_step(ppstmt)) != SQLITE_DONE)
-			LOG_ERROR("Failed to delete extra user sessions: %s", sqlite3_errstr(result));
+		result = sqlite3_bind_int64(ppstmt, 1, time(NULL));
+		result += sqlite3_bind_int(ppstmt, 2, user_id);
+		
+		if(result == SQLITE_OK) {
+			if((result = sqlite3_step(ppstmt)) != SQLITE_DONE)
+				LOG_ERROR("Failed to clean sessions: %s", sqlite3_errstr(result));
+		} else {
+			LOG_ERROR("Failed to bind values to user session cleaning query.");
+		}
 		
 		sqlite3_finalize(ppstmt);
+	} else {
+		LOG_ERROR("Failed to prepare SQL statement for cleaning user sessions: %s", sqlite3_errstr(result));
 	}
 	
 	sqlite3_close(db_conn);
 	
 	return strdup(session_key);
-}
-
-int auth_clean_sessions() {
-	int result;
-	sqlite3 *db_conn = NULL;
-	sqlite3_stmt *ppstmt = NULL;
-	const char sql_delete_invalid_sessions[] = "DELETE FROM sessions WHERE valid_thru < ?1";
-	
-	if((result = sqlite3_open(DB_FILENAME, &db_conn)) != SQLITE_OK) {
-		LOG_ERROR("Failed to open database connection: %s", sqlite3_errstr(result));
-		sqlite3_close(db_conn);
-		
-		return -1;
-	}
-	
-	sqlite3_busy_timeout(db_conn, 1000);
-	
-	if((result = sqlite3_prepare_v2(db_conn, sql_delete_invalid_sessions, -1, &ppstmt, NULL)) != SQLITE_OK) {
-		LOG_ERROR("Failed to prepare SQL statement: %s", sqlite3_errstr(result));
-		sqlite3_close(db_conn);
-		
-		return -1;
-	}
-	
-	if((result = sqlite3_bind_int64(ppstmt, 1, time(NULL))) != SQLITE_OK) {
-		LOG_ERROR("Failed to bind value to prepared statement: %s", sqlite3_errstr(result));
-		sqlite3_finalize(ppstmt);
-		sqlite3_close(db_conn);
-		
-		return -1;
-	}
-	
-	result = sqlite3_step(ppstmt);
-	
-	sqlite3_finalize(ppstmt);
-	sqlite3_close(db_conn);
-	
-	if(result != SQLITE_DONE) {
-		LOG_ERROR("Failed to delete invalid sessions: %s", sqlite3_errstr(result));
-		
-		return -1;
-	}
-	
-	return 0;
 }
 
 int auth_change_user_password(int user_id, const char *new_password) {

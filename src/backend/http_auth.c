@@ -38,8 +38,6 @@ unsigned int url_handler_auth_login_post(struct MHD_Connection *conn,
 	int user_id = 0;
 	char *key = NULL;
 	
-	if(auth_clean_sessions())
-		return MHD_HTTP_INTERNAL_SERVER_ERROR;
 	
 	if(req_data == NULL)
 		return MHD_HTTP_BAD_REQUEST;
