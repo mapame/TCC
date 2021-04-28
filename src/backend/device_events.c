@@ -46,6 +46,7 @@ int store_device_event_db(time_t timestamp, const char *description) {
 	result = sqlite3_step(ppstmt);
 	
 	sqlite3_finalize(ppstmt);
+	sqlite3_close(db_conn);
 	
 	if(result != SQLITE_DONE) {
 		LOG_ERROR("Failed to store device event in database: %s", sqlite3_errstr(result));
