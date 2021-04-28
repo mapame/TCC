@@ -27,6 +27,7 @@ typedef enum {
 	ACT_WRITE_CONFIG,
 	ACT_READ_CONFIG,
 	ACT_RESTART_DEVICE,
+	ACT_SET_RTC,
 	ACT_FW_UPDATE,
 	ACT_READ_STATUS,
 	ACT_READ_ADV_STATUS,
@@ -46,6 +47,7 @@ action_metadata_t action_metadata_list[ACTION_NUM] = {
 	{"config_write",		2},
 	{"config_read",			1},
 	{"restart",				0},
+	{"set_rtc",				0},
 	{"fw_update",			1},
 	{"status",				0},
 	{"status_adv",			0},
@@ -201,6 +203,7 @@ int main(int argc, char **argv) {
 		printf("\t config_write key value\n");
 		printf("\t config_read key\n");
 		printf("\t restart\n");
+		printf("\t set_rtc\n");
 		printf("\t fw_update filename\n");
 		printf("\t status\n");
 		printf("\t get_data type quantity\n");
@@ -287,6 +290,14 @@ int main(int argc, char **argv) {
 		case ACT_RESTART_DEVICE:
 			if((command_result = send_comand_and_receive_response(&client_ctx, OP_RESTART, NULL, NULL, 0))) {
 				fprintf(stderr, "Error sending OP_RESTART command: %s\n", get_comm_status_text(command_result));
+				close(client_ctx.socket_fd);
+			}
+			break;
+		case ACT_SET_RTC:
+			sprintf(txparam, "%ld\t", time(NULL));
+			
+			if((command_result = send_comand_and_receive_response(&client_ctx, OP_SET_RTC, txparam, NULL, 0))) {
+				fprintf(stderr, "Error sending OP_SET_RTC command: %s\n", get_comm_status_text(command_result));
 				close(client_ctx.socket_fd);
 			}
 			break;

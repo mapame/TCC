@@ -24,6 +24,7 @@ static const char opcode_text[OPCODE_NUM][3] = {
 	"CW",
 	"CR",
 	"RE",
+	"SR",
 	"FU",
 	"QS",
 	"GD",
