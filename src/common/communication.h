@@ -1,7 +1,6 @@
 #ifndef COMMUNICATION_H
 #define COMMUNICATION_H
 
-#include <time.h>
 #include <arpa/inet.h>
 
 #define COMM_SERVER_PORT 2048
@@ -42,7 +41,8 @@ typedef struct comm_client_ctx_s {
 	int socket_fd;
 	struct sockaddr_in address;
 	unsigned int counter;
-	time_t last_timestamp;
+	uint32_t self_rndn;
+	uint32_t client_rndn;
 	char version[16];
 	char hmac_key[128];
 } comm_client_ctx;

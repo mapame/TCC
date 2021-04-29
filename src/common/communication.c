@@ -5,7 +5,6 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdint.h>
-#include <time.h>
 
 #include <sys/errno.h>
 #include <sys/types.h>
@@ -51,8 +50,20 @@ static int convert_opcode(char *buf);
 static void compute_hmac(const char *key, char *output_hmac, size_t output_size, const char *data, size_t data_len);
 static int validate_hmac(const char *key, const char *data, size_t len);
 static int recv_command_line(int socket_fd, char *buf, size_t len);
-static int parse_response(char *receive_buffer, int op, time_t timestamp, unsigned int counter, int *response_code, char **parameters);
+static int parse_response(char *receive_buffer, int op, uint32_t self_rndn, unsigned int counter, int *response_code, char **parameters);
 static int parse_parameters(char *parameter_buffer, char parsed_parameters[][PARAM_STR_SIZE], unsigned int parameter_qty);
+
+uint32_t urandom32() {
+	uint32_t rnum = 0;
+	int fd = open("/dev/urandom", O_RDONLY);
+	
+	if(fd != -1) {
+		read(fd, (void *)&rnum, sizeof(uint32_t));
+		close(fd);
+	}
+	
+	return rnum;
+}
 
 const char * get_comm_status_text(comm_status_t status) {
 	if(status >= COMM_STATUS_NUM)
@@ -107,6 +118,7 @@ int comm_accept_client(int main_socket_fd, comm_client_ctx *ctx, const char *hma
 	unsigned int addr_size = sizeof(struct sockaddr_in);
 	struct timeval rcv_timeout_value = {.tv_sec = 2, .tv_usec = 0};
 	int result;
+	char tx_params[16];
 	char received_parameters[PARAM_MAX_QTY][PARAM_STR_SIZE];
 	
 	if(main_socket_fd < 0)
@@ -136,8 +148,12 @@ int comm_accept_client(int main_socket_fd, comm_client_ctx *ctx, const char *hma
 	ctx->hmac_key[sizeof(ctx->hmac_key) - 1] = '\0';
 	
 	ctx->counter = 0;
+	ctx->client_rndn = 0;
+	ctx->self_rndn = urandom32();
 	
-	if((result = send_comand_and_receive_response(ctx, OP_PROTOCOL_START, NULL, received_parameters, 1))) {
+	sprintf(tx_params, "%u", ctx->self_rndn);
+	
+	if((result = send_comand_and_receive_response(ctx, OP_PROTOCOL_START, tx_params, received_parameters, 2))) {
 		LOG_ERROR("Error sending OP_PROTOCOL_START command: %s", get_comm_status_text(result));
 		shutdown(ctx->socket_fd, SHUT_RDWR);
 		close(ctx->socket_fd);
@@ -145,7 +161,9 @@ int comm_accept_client(int main_socket_fd, comm_client_ctx *ctx, const char *hma
 		return -4;
 	}
 	
-	strcpy(ctx->version, received_parameters[0]);
+	sscanf(received_parameters[0], "%u", &ctx->client_rndn);
+	
+	strcpy(ctx->version, received_parameters[1]);
 	
 	return 0;
 }
@@ -187,7 +205,7 @@ int receive_response(comm_client_ctx *client_ctx, int op, int *response_code, ch
 	
 	receive_buffer[received_line_len - 33] = '\0';
 	
-	if((result = parse_response(receive_buffer, op, client_ctx->last_timestamp, client_ctx->counter, &received_response_code, &response_parameters_ptr)))
+	if((result = parse_response(receive_buffer, op, client_ctx->self_rndn, client_ctx->counter, &received_response_code, &response_parameters_ptr)))
 		return result;
 	
 	if(response_code)
@@ -212,9 +230,7 @@ int send_command(comm_client_ctx *client_ctx, int op, const char *parameters) {
 	if(client_ctx == NULL || client_ctx->socket_fd < 0)
 		return COMM_ERR_INVALID_CLIENT_CTX;
 	
-	client_ctx->last_timestamp = time(NULL);
-	
-	sprintf(send_buffer, "%s:%ld:%u:", opcode_text[op], client_ctx->last_timestamp, client_ctx->counter);
+	sprintf(send_buffer, "%s:%u:%u:", opcode_text[op], client_ctx->client_rndn, client_ctx->counter);
 	
 	if(parameters)
 		strlcat(send_buffer, parameters, 200);
@@ -230,11 +246,11 @@ int send_command(comm_client_ctx *client_ctx, int op, const char *parameters) {
 	return COMM_OK;
 }
 
-static int parse_response(char *receive_buffer, int op, time_t timestamp, unsigned int counter, int *response_code, char **parameters) {
+static int parse_response(char *receive_buffer, int op, uint32_t self_rndn, unsigned int counter, int *response_code, char **parameters) {
 	char *token;
 	char *saveptr;
 	
-	time_t received_timestamp;
+	uint32_t received_rndn;
 	unsigned int received_counter;
 	int received_code;
 	
@@ -249,14 +265,14 @@ static int parse_response(char *receive_buffer, int op, time_t timestamp, unsign
 	if(convert_opcode(token) != op)
 		return COMM_ERR_WRONG_RESPONSE;
 	
-	token = strtok_r(NULL, ":", &saveptr); // Timestamp
+	token = strtok_r(NULL, ":", &saveptr); // Random number
 	if(token == NULL)
 		return COMM_ERR_PARSING_RESPONSE;
 	
-	if(sscanf(token, "%ld", &received_timestamp) != 1)
+	if(sscanf(token, "%u", &received_rndn) != 1)
 		return COMM_ERR_PARSING_RESPONSE;
 	
-	if(timestamp != received_timestamp)
+	if(self_rndn != received_rndn)
 		return COMM_ERR_WRONG_RESPONSE;
 	
 	token = strtok_r(NULL, ":", &saveptr); // Counter
