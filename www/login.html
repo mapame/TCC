@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	
+	<link rel="icon" href="favicon.png">
+	<link rel="stylesheet" href="css/bulma.min.css">
+	
+	<script src="js/global_defs.js"></script>
+	<script src="js/auth.js"></script>
+	<script src="js/login.js"></script>
+	
+	<title>SMCEE - Entrar</title>
+</head>
+<body>
+	<nav class="navbar is-light" role="navigation" aria-label="main navigation">
+		<div class="navbar-brand">
+			<a class="navbar-item" href="./">
+				<img src="img/logo.png">
+			</a>
+		</div>
+	</nav>
+	<div class="section">
+		<div class="card" style="max-width: 350px; margin: 0 auto;">
+			<div class="card-content">
+				<div class="field">
+					<label class="label">Usuário</label>
+					<div class="control has-icons-left">
+						<input id="username-field" class="input" type="text" placeholder="" value="">
+						<span class="icon is-small is-left">👤</span>
+					</div>
+				</div>
+				<div class="field">
+					<label class="label">Senha</label>
+					<div class="control has-icons-left">
+						<input id="password-field" class="input" type="password" placeholder="" value="">
+						<span class="icon is-small is-left">🔑</span>
+					</div>
+					<p id="error-message" class="help is-danger">&nbsp;</p>
+				</div>
+				
+				<div class="field">
+					<div class="control">
+						<button id="submit-button" class="button is-link is-pulled-right">Entrar</button>
+						<a class="button is-ghost" href="signup.html">Registrar</a>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</body>
+</html>

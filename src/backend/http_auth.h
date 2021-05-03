@@ -1,6 +1,6 @@
-int http_check_authorization(struct MHD_Connection *conn);
+int http_verify_authorization(struct MHD_Connection *conn);
 
-unsigned int url_handler_auth_login_post(struct MHD_Connection *conn,
+unsigned int url_handler_auth_login(struct MHD_Connection *conn,
 									const char *url,
 									char *req_data,
 									size_t req_data_size,
@@ -9,7 +9,7 @@ unsigned int url_handler_auth_login_post(struct MHD_Connection *conn,
 									size_t *resp_data_size,
 									void *arg);
 
-unsigned int url_handler_auth_check(struct MHD_Connection *conn,
+unsigned int url_handler_auth_verify(struct MHD_Connection *conn,
 									const char *url,
 									char *req_data,
 									size_t req_data_size,

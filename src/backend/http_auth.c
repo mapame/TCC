@@ -8,7 +8,7 @@
 #include "logger.h"
 #include "auth.h"
 
-int http_check_authorization(struct MHD_Connection *conn) {
+int http_verify_authorization(struct MHD_Connection *conn) {
 	const char *authorization_value = NULL;
 	
 	authorization_value = MHD_lookup_connection_value(conn, MHD_HEADER_KIND, "Authorization");
@@ -16,13 +16,10 @@ int http_check_authorization(struct MHD_Connection *conn) {
 	if(authorization_value == NULL || strncmp(authorization_value, "Bearer ", 7))
 		return 0;
 	
-	if(auth_verify_key(&(authorization_value[7])) <= 0)
-		return 0;
-	
-	return 1;
+	return auth_verify_key(&(authorization_value[7]));
 }
 
-unsigned int url_handler_auth_login_post(struct MHD_Connection *conn,
+unsigned int url_handler_auth_login(struct MHD_Connection *conn,
 									const char *url,
 									char *req_data,
 									size_t req_data_size,
@@ -37,7 +34,6 @@ unsigned int url_handler_auth_login_post(struct MHD_Connection *conn,
 	int result;
 	int user_id = 0;
 	char *key = NULL;
-	
 	
 	if(req_data == NULL)
 		return MHD_HTTP_BAD_REQUEST;
@@ -69,23 +65,23 @@ unsigned int url_handler_auth_login_post(struct MHD_Connection *conn,
 	
 	if(result > 0) {
 		*resp_data = (char*) malloc(sizeof(char) * 40);
-		*resp_data_size = sprintf(*resp_data, "FAIL");
+		*resp_data_size = sprintf(*resp_data, "{\"result\":\"%s\"}", (result == 2) ? "inactive" : "wrong");
+	} else {
+		key = auth_new_session(user_id);
+		
+		if(key == NULL)
+			return MHD_HTTP_INTERNAL_SERVER_ERROR;
+		
+		*resp_data = (char*) malloc(sizeof(char) * (40 + strlen(key)));
+		*resp_data_size = sprintf(*resp_data, "{\"result\":\"success\",\"access_key\":\"%s\"}", key);
 	}
 	
-	key = auth_new_session(user_id);
-	
-	if(key == NULL)
-		return MHD_HTTP_INTERNAL_SERVER_ERROR;
-	
-	*resp_data = key;
-	*resp_data_size = strlen(key);
-	
-	//*resp_content_type = strdup(JSON_CONTENT_TYPE);
+	*resp_content_type = strdup(JSON_CONTENT_TYPE);
 	
 	return MHD_HTTP_OK;
 }
 
-unsigned int url_handler_auth_check(struct MHD_Connection *conn,
+unsigned int url_handler_auth_verify(struct MHD_Connection *conn,
 									const char *url,
 									char *req_data,
 									size_t req_data_size,
@@ -93,9 +89,15 @@ unsigned int url_handler_auth_check(struct MHD_Connection *conn,
 									char **resp_data,
 									size_t *resp_data_size,
 									void *arg) {
+	int result;
 	
-	if(!http_check_authorization(conn))
-		return MHD_HTTP_UNAUTHORIZED;
+	if((result = http_verify_authorization(conn)) < 0)
+		return MHD_HTTP_INTERNAL_SERVER_ERROR;
+	
+	*resp_data = (char*) malloc(sizeof(char) * 30);
+	*resp_data_size = sprintf(*resp_data, "{\"result\":\"%s\"}", (result > 0) ? "valid" : "invalid");
+	
+	*resp_content_type = strdup(JSON_CONTENT_TYPE);
 	
 	return MHD_HTTP_OK;
 }

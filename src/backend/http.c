@@ -30,8 +30,8 @@ typedef struct http_url_handler {
 
 static const http_url_handler_t http_url_handler_list[] = {
 	{"", NULL, NULL, NULL, NULL, NULL},
-	{"/auth", NULL, url_handler_auth_check, url_handler_auth_check, NULL, NULL},
-	{"/auth/login", NULL, NULL, url_handler_auth_login_post, NULL},
+	{"/auth/verify", NULL, url_handler_auth_verify, NULL, NULL, NULL},
+	{"/auth/login", NULL, NULL, url_handler_auth_login, NULL},
 };
 
 #if (MHD_VERSION < 0x00097002)
