@@ -151,6 +151,9 @@ int auth_user_login(const char *username, const char *password, int *user_id_ptr
 	if(user_id == 0) // Usuário não existe
 		return 1;
 	
+	if(user_id_ptr)
+		*user_id_ptr = user_id;
+	
 	if(user_is_active == 0) // Usuário não está ativo
 		return 2;
 	
@@ -161,9 +164,6 @@ int auth_user_login(const char *username, const char *password, int *user_id_ptr
 	
 	if(strncmp(correct_hash, hash, HASH_STR_SIZE)) // Senha incorreta
 		return 3;
-	
-	if(user_id_ptr)
-		*user_id_ptr = user_id;
 	
 	return 0;
 }
