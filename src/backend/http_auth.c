@@ -8,7 +8,7 @@
 #include "logger.h"
 #include "auth.h"
 
-unsigned int url_handler_auth_login(struct MHD_Connection *conn,
+unsigned int http_handler_auth_login(struct MHD_Connection *conn,
 									int logged_user_id,
 									path_parameter_t *path_parameters,
 									char *req_data,
@@ -71,7 +71,7 @@ unsigned int url_handler_auth_login(struct MHD_Connection *conn,
 	return MHD_HTTP_OK;
 }
 
-unsigned int url_handler_auth_verify(struct MHD_Connection *conn,
+unsigned int http_handler_auth_verify(struct MHD_Connection *conn,
 									int logged_user_id,
 									path_parameter_t *path_parameters,
 									char *req_data,

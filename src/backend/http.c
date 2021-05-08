@@ -51,17 +51,15 @@ static const path_segment_t url_path_tree = {
 			.children = (const path_segment_t[]) {
 				{
 					.text = "verify",
-					.get_handler = url_handler_auth_verify,
+					.get_handler = http_handler_auth_verify,
 				},
 				{
 					.text = "login",
-					.post_handler = url_handler_auth_login,
+					.post_handler = http_handler_auth_login,
 				},
 				{}
 			}
 		},{
-			.text = "config",
-			.get_handler = url_handler_config_list
 		},{
 		},
 	}
