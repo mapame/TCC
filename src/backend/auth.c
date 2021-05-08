@@ -40,7 +40,7 @@ int auth_verify_key(const char *key) {
 	int result;
 	sqlite3 *db_conn = NULL;
 	sqlite3_stmt *ppstmt = NULL;
-	const char sql_verify_key[] = "SELECT user_id FROM sessions WHERE key=?1 AND valid_thru>=?2;";
+	const char sql_verify_key[] = "SELECT user_id FROM sessions INNER JOIN users ON users.id = sessions.user_id WHERE key=?1 AND valid_thru>=?2 AND users.is_active = 1;";
 	int user_id = 0;
 	
 	if((result = sqlite3_open(DB_FILENAME, &db_conn)) != SQLITE_OK) {
