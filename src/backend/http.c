@@ -7,6 +7,7 @@
 
 #include "http.h"
 #include "logger.h"
+#include "auth.h"
 
 #include "http_auth.h"
 #include "http_config.h"
@@ -21,6 +22,7 @@ typedef struct http_req_ctx {
 
 typedef unsigned int
 (*http_handler_func_t)(struct MHD_Connection *conn,
+							int logged_user_id,
 							path_parameter_t *path_parameters,
 							char *req_data,
 							size_t req_data_size,
@@ -206,8 +208,17 @@ http_global_handler(void *cls, struct MHD_Connection *connection,
 		else
 			status = MHD_HTTP_METHOD_NOT_ALLOWED;
 		
-		if(handler_f)
-			status = (handler_f)(connection, path_parameters, req_context->data, req_context->data_size, &resp_content_type, &resp_data, &resp_data_size, path_seg->arg);
+		if(handler_f) {
+			const char *authorization_value = NULL;
+			int logged_user_id = -1;
+			
+			authorization_value = MHD_lookup_connection_value(connection, MHD_HEADER_KIND, "Authorization");
+			
+			if(authorization_value && strncmp(authorization_value, "Bearer ", 7) == 0)
+				logged_user_id = auth_verify_key(authorization_value + 7);
+			
+			status = (handler_f)(connection, logged_user_id, path_parameters, req_context->data, req_context->data_size, &resp_content_type, &resp_data, &resp_data_size, path_seg->arg);
+		}
 		
 		if(path_parameters)
 			free_parameters(path_parameters);
