@@ -66,7 +66,7 @@ static const path_segment_t url_path_tree = {
 };
 
 
-void free_parameters(path_parameter_t *parameters) {
+static void free_parameters(path_parameter_t *parameters) {
 	path_parameter_t *next;
 	
 	while(parameters) {
@@ -86,11 +86,10 @@ static const path_segment_t *resolve_url_path(const char *url_path, path_paramet
 	char *tmp_ptr;
 	char *saveptr;
 	char *seg_text;
-	
-	path_parameter_t **param_ptr = parameters;
 	int pos = 0;
 	
-	*param_ptr = NULL;
+	if(parameters)
+		*parameters = NULL;
 	
 	tmp_ptr = url_path_copy;
 	while(child_ptr && (seg_text = strtok_r(tmp_ptr, "/", &saveptr))) {
@@ -100,14 +99,12 @@ static const path_segment_t *resolve_url_path(const char *url_path, path_paramet
 		
 		while(child_ptr && child_ptr->text) {
 			if(strcmp(child_ptr->text, "*") == 0) {
-				if(param_ptr) {
-					*param_ptr = (path_parameter_t*) malloc(sizeof(path_parameter_t));
+				if(parameters && (*parameters = (path_parameter_t*) malloc(sizeof(path_parameter_t)))) {
+					(*parameters)->pos = pos;
+					(*parameters)->value = strdup(seg_text);
+					(*parameters)->next = NULL;
 					
-					if(*param_ptr) {
-						(*param_ptr)->pos = pos;
-						(*param_ptr)->value = strdup(seg_text);
-						param_ptr = &((*param_ptr)->next);
-					}
+					parameters = &((*parameters)->next);
 				}
 				
 				break;
@@ -118,9 +115,6 @@ static const path_segment_t *resolve_url_path(const char *url_path, path_paramet
 			child_ptr++;
 		}
 	}
-	
-	if(param_ptr && *param_ptr)
-		(*param_ptr)->next = NULL;
 	
 	free(url_path_copy);
 	
