@@ -65,6 +65,16 @@ static const path_segment_t url_path_tree = {
 	}
 };
 
+const char *http_parameter_get_value(const path_parameter_t *parameters, int position) {
+	while(parameters) {
+		if(parameters->pos == position)
+			return parameters->value;
+		
+		parameters = parameters->next;
+	}
+	
+	return NULL;
+}
 
 static void free_parameters(path_parameter_t *parameters) {
 	path_parameter_t *next;

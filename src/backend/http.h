@@ -13,6 +13,8 @@ typedef struct path_parameter_s {
 	struct path_parameter_s *next;
 } path_parameter_t;
 
+const char *http_parameter_get_value(const path_parameter_t *parameters, int position);
+
 struct MHD_Daemon* http_init(uint16_t port);
 void http_stop(struct MHD_Daemon *httpd);
 
