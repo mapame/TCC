@@ -1,3 +1,5 @@
+#include "http.h"
+
 unsigned int http_handler_auth_login(struct MHD_Connection *conn,
 									int logged_user_id,
 									path_parameter_t *path_parameters,

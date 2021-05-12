@@ -6,6 +6,7 @@
 
 #include "http.h"
 #include "logger.h"
+#include "users.h"
 #include "auth.h"
 
 unsigned int http_handler_auth_login(struct MHD_Connection *conn,
@@ -21,9 +22,8 @@ unsigned int http_handler_auth_login(struct MHD_Connection *conn,
 	json_object *top_json = NULL;
 	json_object *username_json = NULL, *password_json = NULL;
 	char *username = NULL, *password = NULL;
-	int result;
 	int user_id = 0;
-	char *key = NULL;
+	char *key;
 	
 	if(req_data == NULL)
 		return MHD_HTTP_BAD_REQUEST;
@@ -45,25 +45,32 @@ unsigned int http_handler_auth_login(struct MHD_Connection *conn,
 	
 	json_object_put(top_json);
 	
-	result = auth_user_login(username, password, &user_id);
+	user_id = auth_user_login(username, password);
 	
 	free(username);
 	free(password);
 	
-	if(result < 0)
+	if(user_id < 0)
 		return MHD_HTTP_INTERNAL_SERVER_ERROR;
 	
-	if(result > 0) {
-		*resp_data = (char*) malloc(sizeof(char) * 40);
-		*resp_data_size = sprintf(*resp_data, "{\"result\":\"%s\"}", (result == 2) ? "inactive" : "wrong");
+	*resp_data = (char*) malloc(sizeof(char) * 256);
+	
+	if(user_id == 0) {
+		*resp_data_size = sprintf(*resp_data, "{\"result\":\"wrong\"}");
+		
+	} else if(users_check_active(user_id) == 0) {
+		*resp_data_size = sprintf(*resp_data, "{\"result\":\"inactive\"}");
+		
 	} else {
-		key = auth_new_session(user_id);
-		
-		if(key == NULL)
+		if((key = auth_new_session(user_id)) == NULL) {
+			free(*resp_data);
+			
 			return MHD_HTTP_INTERNAL_SERVER_ERROR;
+		}
 		
-		*resp_data = (char*) malloc(sizeof(char) * (40 + strlen(key)));
 		*resp_data_size = sprintf(*resp_data, "{\"result\":\"success\",\"access_key\":\"%s\"}", key);
+		
+		free(key);
 	}
 	
 	*resp_content_type = strdup(JSON_CONTENT_TYPE);
