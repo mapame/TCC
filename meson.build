@@ -15,7 +15,8 @@ backend_sources =	['src/backend/main.c',
 					'src/backend/disaggregation.c',
 					'src/backend/device_events.c',
 					'src/backend/auth.c',
-					'src/backend/http_auth.c']
+					'src/backend/http_auth.c',
+					'src/backend/users.c',
 
 
 executable('tcc-remote-control',
