@@ -60,6 +60,17 @@ static const path_segment_t url_path_tree = {
 				{}
 			}
 		},{
+			.text = "users",
+			.get_handler = http_handler_get_user_list,
+			.post_handler = http_handler_create_user,
+			.children = (const path_segment_t[]) {
+				{
+					.text = "*",
+					.get_handler = http_handler_get_user,
+					.put_handler = http_handler_update_user,
+				},
+				{}
+			}
 		},{
 		},
 	}
