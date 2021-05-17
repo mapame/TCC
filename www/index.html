@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	
+	<link rel="icon" href="favicon.png">
+	<link rel="stylesheet" href="css/bulma.min.css">
+	
+	<script src="js/global_defs.js"></script>
+	<script src="js/auth.js"></script>
+	<script src="js/user_info.js"></script>
+	<script src="js/navbar.js"></script>
+	
+	<script>
+	window.onload = function() {
+		authCheckAccessKey(initPage, redirectToLogin);
+		addEventsNavbarBurgers();
+	}
+	
+	function initPage() {
+		userInfoFetch(function() {navbarPopulateItems("main-menu");});
+	}
+	</script>
+	
+	<title>SMCEE</title>
+</head>
+<body>
+	<nav class="navbar is-light" role="navigation" aria-label="main navigation">
+		<div class="navbar-brand">
+			<a class="navbar-item" href="./">
+				<img src="img/logo.png">
+			</a>
+			<a role="button" class="navbar-burger" data-target="main-menu">
+				<span></span>
+				<span></span>
+				<span></span>
+			</a>
+		</div>
+		<div id="main-menu" class="navbar-menu">
+		</div>
+	</nav>
+	<div class="section">
+		<div class="container">
+		</div>
+	</div>
+</body>
+</html>
