@@ -251,3 +251,52 @@ char *auth_new_session(int user_id) {
 	
 	return strdup(session_key);
 }
+
+int auth_delete_session(const char *session_key) {
+	int result;
+	sqlite3 *db_conn = NULL;
+	sqlite3_stmt *ppstmt = NULL;
+	const char sql_delete_session[] = "DELETE FROM sessions WHERE key = ?1;";
+	
+	if(session_key == NULL)
+		return 0;
+	
+	if((result = sqlite3_open(DB_FILENAME, &db_conn)) != SQLITE_OK) {
+		LOG_ERROR("Failed to open database connection: %s", sqlite3_errstr(result));
+		sqlite3_close(db_conn);
+		
+		return -1;
+	}
+	
+	sqlite3_busy_timeout(db_conn, 1000);
+	
+	if((result = sqlite3_prepare_v2(db_conn, sql_delete_session, -1, &ppstmt, NULL)) != SQLITE_OK) {
+		LOG_ERROR("Failed to prepare SQL statement: %s", sqlite3_errstr(result));
+		sqlite3_close(db_conn);
+		
+		return -1;
+	}
+	
+	if(sqlite3_bind_text(ppstmt, 1, session_key, -1, SQLITE_STATIC) != SQLITE_OK) {
+		LOG_ERROR("Failed to bind value to prepared statement.");
+		sqlite3_finalize(ppstmt);
+		sqlite3_close(db_conn);
+		
+		return -1;
+	}
+	
+	result = sqlite3_step(ppstmt);
+	
+	sqlite3_finalize(ppstmt);
+	
+	if(result != SQLITE_DONE) {
+		LOG_ERROR("Failed to delete session: %s", sqlite3_errstr(result));
+		sqlite3_close(db_conn);
+		
+		return -1;
+	}
+	
+	sqlite3_close(db_conn);
+	
+	return 0;
+}

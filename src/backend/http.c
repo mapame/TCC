@@ -57,6 +57,10 @@ static const path_segment_t url_path_tree = {
 					.text = "login",
 					.post_handler = http_handler_auth_login,
 				},
+				{
+					.text = "logout",
+					.post_handler = http_handler_auth_logout,
+				},
 				{}
 			}
 		},{
