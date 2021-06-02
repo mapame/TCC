@@ -1,0 +1,71 @@
+.dashboard-container {
+	color: #aaa;
+	padding: 1.75rem 0.75rem 0.75rem 0.75rem;
+	background-color: #222;
+	margin: 0.2rem;
+	border-radius: 3px;
+	position: relative;
+}
+.dashboard-container > .dashboard-label {
+	color: #aaa;
+	position: absolute;
+	left: 0;
+	top: 0;
+	display: inline-block;
+	background: rgba(0,0,0,0.4);
+	font-family: monospace;
+	font-size: 0.8em;
+	padding: 5px 10px;
+	border-radius: 3px;
+}
+
+.gauge-container {
+	width: auto;
+	height: auto;
+	display: block;
+	padding: 10px;
+	overflow: hidden;
+	margin-bottom: -0.5rem;
+}
+
+.gauge-container.ptotal .value-text {
+	font-size: 0.75rem;
+	font-weight: bold;
+	font-family: inherit;
+}
+
+.gauge-container.ptotal > .gauge > .dial {
+	stroke: #334455;
+	stroke-width: 10;
+}
+
+.gauge-container.ptotal > .gauge > .value {
+	stroke-dasharray: none;
+	stroke-width: 10;
+}
+
+.gauge-container.voltage .value-text {
+	font-size: 0.75rem;
+	font-weight: bold;
+	font-family: inherit;
+}
+
+.gauge-container.voltage > .gauge > .dial {
+	stroke: #334455;
+	stroke-width: 8;
+}
+
+.gauge-container.voltage > .gauge > .value {
+	stroke-dasharray: none;
+	stroke-width: 12;
+}
+
+#power-chart {
+	width: 100%;
+	height: 98%;
+	min-height: 25vh;
+}
+
+.dygraph-axis-label {
+	color: #aaa !important;
+}

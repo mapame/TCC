@@ -16,5 +16,6 @@ int load_saved_power_data();
 void close_power_data_file();
 int store_power_data(power_data_t *pd_ptr);
 int get_power_data(time_t timestamp_start, time_t timestamp_end, power_data_t *buffer, int buffer_len);
+time_t power_get_last_timestamp();
 
 #endif

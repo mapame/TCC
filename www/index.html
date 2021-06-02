@@ -7,21 +7,18 @@
 	<link rel="icon" href="favicon.png">
 	<link rel="stylesheet" href="css/bulma.min.css">
 	
+	<link rel="stylesheet" href="css/dashboard.css">
+	
+	<script src="js/gauge.min.js"></script>
+	<script src="js/dygraph.min.js"></script>
+	<link rel="stylesheet" href="css/dygraph.css">
+	
 	<script src="js/global_defs.js"></script>
 	<script src="js/auth.js"></script>
 	<script src="js/user_info.js"></script>
 	<script src="js/navbar.js"></script>
 	
-	<script>
-	window.onload = function() {
-		authCheckAccessKey(initPage, redirectToLogin);
-		addEventsNavbarBurgers();
-	}
-	
-	function initPage() {
-		userInfoFetch(function() {navbarPopulateItems("main-menu");});
-	}
-	</script>
+	<script src="js/dashboard.js"></script>
 	
 	<title>SMCEE</title>
 </head>
@@ -41,7 +38,58 @@
 		</div>
 	</nav>
 	<div class="section">
-		<div class="container">
+		<div class="container is-max-desktop">
+			<div class="columns">
+				<div class="column dashboard-container">
+					<span class="dashboard-label">Hoje</span>
+					<p class="is-size-2 has-text-centered"><span id="energy-today-value">----.-</span> KWh</p>
+					<p class="is-size-4 has-text-centered">R$ <span id="energy-today-cost">---.--</span></p>
+				</div>
+				<div class="column dashboard-container">
+					<span class="dashboard-label">Média diária (7d)</span>
+					<p class="is-size-2 has-text-centered"><span id="energy-dailyavg-value">----.-</span> KWh</p>
+					<p class="is-size-4 has-text-centered">R$ <span id="energy-dailyavg-cost">---.--</span></p>
+				</div>
+				<div class="column dashboard-container">
+					<span class="dashboard-label is-capitalized current-month-label">Mês</span>
+					<p class="is-size-2 has-text-centered"><span id="energy-this-month-value">----.-</span> KWh</p>
+					<p class="is-size-4 has-text-centered">R$ <span id="energy-this-month-cost">---.--</span></p>
+				</div>
+				<div class="column dashboard-container">
+					<span class="dashboard-label">Estimativa para <span class="current-month-label">o mês</span></span>
+					<p class="is-size-2 has-text-centered"><span id="energy-month-estimate-value">----.-</span> KWh</p>
+					<p class="is-size-4 has-text-centered">R$ <span id="energy-month-estimate-cost">---.--</span></p>
+				</div>
+			</div>
+			<div class="columns">
+				<div class="column is-two-fifths">
+					<div class="columns is-flex">
+						<div class="column dashboard-container">
+							<span class="dashboard-label">Consumo Atual</span>
+							<div id="power-gauge" class="pb-0 gauge-container ptotal"></div>
+							<p class="is-size-6 has-text-weight-bold has-text-centered"><span id="power-a-value">---.-</span> W | <span id="power-b-value">---.-</span> W</p>
+							<p class="is-size-4 has-text-centered">R$ <span id="hourly-cost">---.-</span><span class="is-size-6">/hora</span></p>
+						</div>
+					</div>
+					<div class="columns">
+						<div class="column dashboard-container">
+							<span class="dashboard-label">Tensão da Rede</span>
+							<div class="columns is-mobile">
+								<div class="column">
+									<div id="voltage-a-gauge" class="pl-0 pr-0 gauge-container voltage"></div>
+								</div>
+								<div class="column">
+									<div id="voltage-b-gauge" class="pl-0 pr-0 gauge-container voltage"></div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="column dashboard-container">
+					<span class="dashboard-label">Gráfico de Consumo</span>
+					<div id="power-chart"></div>
+				</div>
+			</div>
 		</div>
 	</div>
 </body>

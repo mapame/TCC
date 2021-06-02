@@ -11,6 +11,8 @@
 
 #include "http_auth.h"
 #include "http_config.h"
+#include "http_dashboard.h"
+#include "http_power.h"
 
 #define CONNECTION_LIMIT 200
 #define CONNECTION_TIMEOUT 5
@@ -76,7 +78,13 @@ static const path_segment_t url_path_tree = {
 				{}
 			}
 		},{
+			.text = "dashboard",
+			.get_handler = http_handler_get_dashboard_data
+		},{
+			.text = "power",
+			.get_handler = http_handler_get_power_data,
 		},
+		{}
 	}
 };
 

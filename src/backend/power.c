@@ -232,3 +232,16 @@ int get_power_data(time_t timestamp_start, time_t timestamp_end, power_data_t *b
 	
 	return output_count;
 }
+
+time_t power_get_last_timestamp() {
+	time_t timestamp;
+	
+	if(pthread_mutex_lock(&power_data_mutex))
+		return -1;
+	
+	timestamp = last_loaded_timestamp;
+	
+	pthread_mutex_unlock(&power_data_mutex);
+	
+	return timestamp;
+}
