@@ -78,6 +78,39 @@ static const path_segment_t url_path_tree = {
 				{}
 			}
 		},{
+			.text = "appliances",
+			.get_handler = http_handler_get_appliance_list,
+			.post_handler = http_handler_create_appliance,
+			.children = (const path_segment_t[]) {
+				{
+					.text = "signatures",
+					.get_handler = http_handler_get_appliance_signature_list,
+					.children = (const path_segment_t[]) {
+						{
+							.text = "*",
+							.get_handler = http_handler_get_appliance_signature,
+							.delete_handler = http_handler_delete_appliance_signature,
+						},
+						{}
+					}
+				},
+				{
+					.text = "*",
+					.get_handler = http_handler_get_appliance,
+					.put_handler = http_handler_update_appliance,
+					.children = (const path_segment_t[]) {
+						{
+							.text = "signatures",
+							.arg = (void*)"has_appliance_id",
+							.get_handler = http_handler_get_appliance_signature_list,
+							.post_handler = http_handler_add_appliance_signatures,
+						},
+						{}
+					}
+				},
+				{}
+			}
+		},{
 			.text = "dashboard",
 			.get_handler = http_handler_get_dashboard_data
 		},{

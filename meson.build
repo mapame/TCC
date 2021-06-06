@@ -19,6 +19,7 @@ backend_sources =	['src/backend/main.c',
 					'src/backend/http_power.c',
 					'src/backend/auth.c',
 					'src/backend/http_auth.c',
+					'src/backend/http_appliances.c',
 					'src/backend/users.c',
 					'src/backend/http_users.c']
 
