@@ -68,12 +68,12 @@ window.onload = function() {
 			}
 		}
 	);
-	
-	dashboardFetchData();
 }
 
 function initPage() {
 	userInfoFetch(function() {navbarPopulateItems("main-menu");});
+	
+	dashboardFetchData();
 }
 
 function dashboardPowerGraphAddData(timestamp, power) {
