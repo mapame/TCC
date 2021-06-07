@@ -1,6 +1,10 @@
 function addEventsNavbarBurgers() {
-	for(burguerElement of document.getElementsByClassName("navbar-burger"))
+	for(burguerElement of document.getElementsByClassName("navbar-burger")) {
 		burguerElement.onclick = burguerNavbarToggle;
+		burguerElement.appendChild(document.createElement("span"));
+		burguerElement.appendChild(document.createElement("span"));
+		burguerElement.appendChild(document.createElement("span"));
+	}
 }
 
 function burguerNavbarToggle() {
@@ -66,7 +70,7 @@ function navbarPopulateItems(navbarContainerId) {
 						
 					} else if(typeof dropdownItem.name === "object" && dropdownItem.name === null) {
 						dropdownItemElement = document.createElement("hr");
-						dropdownItemElement.className = "dropdown-divider";
+						dropdownItemElement.className = "navbar-divider";
 					}
 					
 					dropdownContainer.appendChild(dropdownItemElement);
