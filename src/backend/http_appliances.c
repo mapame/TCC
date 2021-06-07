@@ -73,7 +73,7 @@ unsigned int http_handler_get_appliance_list(struct MHD_Connection *conn,
 	sqlite3 *db_conn = NULL;
 	sqlite3_stmt *ppstmt = NULL;
 	const char *str_ptr;
-	const char sql_get_appliances[] = "SELECT appliances.id,name,appliances.is_active,power,is_hardwired,appliances.creation_date,appliances.modification_date,IFNULL(signatures.qty, 0) AS signature_qty,signatures.avgp AS signatures_avg_p FROM appliances LEFT JOIN (SELECT appliance_id,COUNT(*) AS qty,AVG(ABS(peak_pt)) AS avgp FROM signatures GROUP BY appliance_id) AS signatures ON signatures.appliance_id = appliances.id;";
+	const char sql_get_appliances[] = "SELECT appliances.id,name,appliances.is_active,power,is_hardwired,appliances.creation_date,appliances.modification_date,IFNULL(signatures.qty, 0) AS signature_qty FROM appliances LEFT JOIN (SELECT appliance_id,COUNT(*) AS qty FROM signatures GROUP BY appliance_id) AS signatures ON signatures.appliance_id = appliances.id;";
 	
 	struct json_object* json_response = NULL;
 	struct json_object* json_appliance_item = NULL;
@@ -116,7 +116,6 @@ unsigned int http_handler_get_appliance_list(struct MHD_Connection *conn,
 		json_object_object_add_ex(json_appliance_item, "creation_date", json_object_new_int64(sqlite3_column_int64(ppstmt, 5)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		json_object_object_add_ex(json_appliance_item, "modification_date", json_object_new_int64(sqlite3_column_int64(ppstmt, 6)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		json_object_object_add_ex(json_appliance_item, "signature_qty", json_object_new_int(sqlite3_column_int(ppstmt, 7)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
-		json_object_object_add_ex(json_appliance_item, "signatures_avg_p", json_object_new_double(sqlite3_column_double(ppstmt, 8)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 	}
 	
 	sqlite3_finalize(ppstmt);
@@ -161,7 +160,7 @@ unsigned int http_handler_get_appliance(struct MHD_Connection *conn,
 	sqlite3 *db_conn = NULL;
 	sqlite3_stmt *ppstmt = NULL;
 	const char *str_ptr;
-	const char sql_get_appliance[] = "SELECT name,is_active,power,is_hardwired,creation_date,modification_date,signature_qty,signatures_avg_p FROM appliances,(SELECT COUNT(*) AS signature_qty,AVG(ABS(delta_pt)) AS signatures_avg_p FROM signatures WHERE appliance_id = ?1) WHERE id = ?1;";
+	const char sql_get_appliance[] = "SELECT name,is_active,power,is_hardwired,creation_date,modification_date,signature_qty FROM appliances WHERE id = ?1;";
 	int count = 0;
 	
 	struct json_object* json_response = NULL;
@@ -217,7 +216,6 @@ unsigned int http_handler_get_appliance(struct MHD_Connection *conn,
 		json_object_object_add_ex(json_response, "creation_date", json_object_new_int64(sqlite3_column_int64(ppstmt, 4)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		json_object_object_add_ex(json_response, "modification_date", json_object_new_int64(sqlite3_column_int64(ppstmt, 5)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		json_object_object_add_ex(json_response, "signature_qty", json_object_new_int(sqlite3_column_int(ppstmt, 6)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
-		json_object_object_add_ex(json_response, "signatures_avg_p", json_object_new_int(sqlite3_column_int(ppstmt, 7)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 	}
 	
 	sqlite3_finalize(ppstmt);
