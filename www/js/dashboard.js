@@ -73,6 +73,7 @@ window.onload = function() {
 function initPage() {
 	userInfoFetch(function() {navbarPopulateItems("main-menu");});
 	
+	fetchPastPowerData();
 	dashboardFetchData();
 }
 
@@ -99,7 +100,7 @@ function dashboardPowerGraphAddData(timestamp, power) {
 		window.dashboardPowerData = window.dashboardPowerData.slice(window.dashboardPowerData.length - 3600);
 }
 
-function fetchPastPowerData(startTimestamp) {
+function fetchPastPowerData() {
 	var accessKey = localStorage.getItem("access_key");
 	var xhrHistoricData = new XMLHttpRequest();
 	
@@ -118,7 +119,7 @@ function fetchPastPowerData(startTimestamp) {
 		}
 	}
 	
-	xhrHistoricData.open("GET", window.smceeApiUrlBase + "power?type=pt&start=" + startTimestamp);
+	xhrHistoricData.open("GET", window.smceeApiUrlBase + "power?type=pt&last=3600");
 	
 	xhrHistoricData.timeout = 2000;
 	
@@ -164,9 +165,7 @@ function dashboardFetchData() {
 				if(typeof responseObject.power == "object" && responseObject.power.length > 1) {
 					let lastPowerData = responseObject.power[responseObject.power.length - 1];
 					
-					if(typeof window.dashboardPowerData == "undefined") {
-						fetchPastPowerData(lastPowerData.timestamp - 3600);
-					} else {
+					if(typeof window.dashboardPowerData == "object") {
 						for(pdItem of responseObject.power)
 							dashboardPowerGraphAddData(pdItem.timestamp, pdItem.p1 + pdItem.p2);
 						

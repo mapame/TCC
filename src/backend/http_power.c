@@ -29,19 +29,20 @@ unsigned int http_handler_get_power_data(struct MHD_Connection *conn,
 										size_t *resp_data_size,
 										void *arg) {
 	
+	const char *type_str = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "type");
+	const char *last_secs_str = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "last");
 	const char *start_timestamp_str = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "start");
 	const char *end_timestamp_str = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "end");
-	const char *type_str = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "type");
-	time_t start_timestamp, end_timestamp;
+	
 	enum power_get_type type;
+	int last_secs;
+	time_t start_timestamp, end_timestamp;
 	
 	power_data_t *pd_buffer = NULL;
 	int pd_qty;
 	
-	/*
 	if(logged_user_id <= 0)
 		return MHD_HTTP_UNAUTHORIZED;
-	*/
 	
 	if(type_str == NULL || !strcmp(type_str, "pt"))
 		type = POWER_GET_PT;
@@ -58,20 +59,26 @@ unsigned int http_handler_get_power_data(struct MHD_Connection *conn,
 	else
 		return MHD_HTTP_BAD_REQUEST;
 	
-	if(start_timestamp_str == NULL || sscanf(start_timestamp_str, "%ld", &start_timestamp) != 1)
+	if(last_secs_str) {
+		if(sscanf(last_secs_str, "%d", &last_secs) != 1)
+			return MHD_HTTP_BAD_REQUEST;
+		
+		if(last_secs < 0 || last_secs > 12 * 3600)
+			return MHD_HTTP_BAD_REQUEST;
+		
+		end_timestamp = power_get_last_timestamp();
+		start_timestamp = end_timestamp - last_secs;
+		
+	} else if(start_timestamp_str && end_timestamp_str) {
+		if(sscanf(start_timestamp_str, "%ld", &start_timestamp) != 1 || sscanf(end_timestamp_str, "%ld", &end_timestamp) != 1)
+			return MHD_HTTP_BAD_REQUEST;
+		
+		if(end_timestamp <= 0 || start_timestamp<= 0 || end_timestamp < start_timestamp || end_timestamp - start_timestamp > 12 * 3600)
+			return MHD_HTTP_BAD_REQUEST;
+		
+	} else {
 		return MHD_HTTP_BAD_REQUEST;
-	
-	if(end_timestamp_str == NULL || sscanf(end_timestamp_str, "%ld", &end_timestamp) != 1)
-		end_timestamp = start_timestamp + 12 * 3600;
-	
-	if(end_timestamp < start_timestamp)
-		return MHD_HTTP_BAD_REQUEST;
-	
-	if(end_timestamp > time(NULL))
-		end_timestamp = time(NULL);
-	
-	if(end_timestamp - start_timestamp > 12 * 3600)
-		return MHD_HTTP_BAD_REQUEST;
+	}
 	
 	pd_buffer = (power_data_t*) malloc(sizeof(power_data_t) * (1 + end_timestamp - start_timestamp));
 	
