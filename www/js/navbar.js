@@ -107,8 +107,8 @@ function navbarPopulateItems(navbarContainerId) {
 		usernameNavbarItem.className = "navbar-item";
 		
 		usernameContainer.className = "tags has-addons";
-		usernameTag.className = "tag is-rounded is-dark has-text-weight-bold";
-		logoutButton.className = "tag is-delete is-rounded is-danger";
+		usernameTag.className = "tag is-rounded is-light has-text-weight-bold";
+		logoutButton.className = "tag is-delete is-rounded is-light is-danger";
 		
 		//usernameTag.addEventListener("click", userChangePassword);
 		logoutButton.addEventListener("click", authLogout);
