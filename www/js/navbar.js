@@ -93,8 +93,9 @@ function navbarPopulateItems(navbarContainerId) {
 	if(typeof window.loggedUserInfo === "object" && window.loggedUserInfo !== null) {
 		let usernameNavbarItem = document.createElement("div");
 		let usernameContainer = document.createElement("div");
-		let usernameTag = document.createElement("a");
-		let logoutButton = document.createElement("a"); 
+		let usernameTag = document.createElement("span");
+		let usernameTagText = document.createElement("span");
+		let logoutButton = document.createElement("a");
 		
 		navbarEnd.appendChild(usernameNavbarItem);
 		
@@ -112,9 +113,20 @@ function navbarPopulateItems(navbarContainerId) {
 		//usernameTag.addEventListener("click", userChangePassword);
 		logoutButton.addEventListener("click", authLogout);
 		
-		if(window.loggedUserInfo.is_admin === true)
-			usernameTag.innerHTML = "&#128081;&nbsp;";
+		usernameTagText.innerText = window.loggedUserInfo.name;
 		
-		usernameTag.innerText += window.loggedUserInfo.name;
+		if(window.loggedUserInfo.is_admin === true) {
+			let usernameAdminIconContainer = document.createElement("span");
+			let usernameAdminIcon = document.createElement("i");
+			
+			usernameAdminIconContainer.className = "icon is-small";
+			usernameAdminIcon.className = "mdi mdi-crown";
+			
+			usernameAdminIconContainer.appendChild(usernameAdminIcon);
+			usernameTag.appendChild(usernameAdminIconContainer);
+			
+		}
+		
+		usernameTag.appendChild(usernameTagText);
 	}
 }
