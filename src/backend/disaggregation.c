@@ -107,6 +107,7 @@ void *disaggregation_loop(void *argp) {
 								load_event.peak_pt = (ptotal_buffer[z] - pavg_before);
 					}
 					
+					load_event.top_appliance_id = -1;
 					pthread_mutex_lock(&load_event_mutex);
 					
 					memcpy(&load_event_buffer[load_event_buffer_pos], &load_event, sizeof(load_event_t));

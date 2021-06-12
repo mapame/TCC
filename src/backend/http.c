@@ -116,6 +116,13 @@ static const path_segment_t url_path_tree = {
 		},{
 			.text = "power",
 			.get_handler = http_handler_get_power_data,
+			.children = (const path_segment_t[]) {
+				{
+					.text = "events",
+					.get_handler = http_handler_get_load_events,
+				},
+				{}
+			}
 		},
 		{}
 	}

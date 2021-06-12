@@ -8,7 +8,7 @@ typedef struct load_event_s {
 	double delta_s[2];
 	double delta_q[2];
 	
-	int appliance_id;
+	int top_appliance_id;
 	
 } load_event_t;
 

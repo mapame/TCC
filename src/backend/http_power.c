@@ -9,6 +9,7 @@
 #include "logger.h"
 #include "http.h"
 #include "power.h"
+#include "disaggregation.h"
 
 enum power_get_type {
 	POWER_GET_PT,
@@ -129,6 +130,107 @@ unsigned int http_handler_get_power_data(struct MHD_Connection *conn,
 	
 	*resp_data_size *= sizeof(char);
 	
+	*resp_content_type = strdup(JSON_CONTENT_TYPE);
+	
+	return MHD_HTTP_OK;
+}
+
+unsigned int http_handler_get_load_events(struct MHD_Connection *conn,
+										int logged_user_id,
+										path_parameter_t *path_parameters,
+										char *req_data,
+										size_t req_data_size,
+										char **resp_content_type,
+										char **resp_data,
+										size_t *resp_data_size,
+										void *arg) {
+	
+	const char *last_secs_str = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "last");
+	const char *start_timestamp_str = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "start");
+	const char *end_timestamp_str = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "end");
+	
+	int last_secs;
+	time_t start_timestamp, end_timestamp;
+	
+	json_object *response_array = NULL;
+	json_object *response_item = NULL;
+	json_object *appliance_array = NULL;
+	
+	load_event_t *loadev_buffer = NULL;
+	int qty;
+	
+	if(logged_user_id <= 0)
+		return MHD_HTTP_UNAUTHORIZED;
+	
+	if(last_secs_str) {
+		if(sscanf(last_secs_str, "%d", &last_secs) != 1)
+			return MHD_HTTP_BAD_REQUEST;
+		
+		if(last_secs < 0 || last_secs > 12 * 3600)
+			return MHD_HTTP_BAD_REQUEST;
+		
+		end_timestamp = power_get_last_timestamp();
+		start_timestamp = end_timestamp - last_secs;
+		
+	} else if(start_timestamp_str && end_timestamp_str) {
+		if(sscanf(start_timestamp_str, "%ld", &start_timestamp) != 1 || sscanf(end_timestamp_str, "%ld", &end_timestamp) != 1)
+			return MHD_HTTP_BAD_REQUEST;
+		
+		if(end_timestamp <= 0 || start_timestamp<= 0 || end_timestamp < start_timestamp || end_timestamp - start_timestamp > 12 * 3600)
+			return MHD_HTTP_BAD_REQUEST;
+		
+	} else {
+		return MHD_HTTP_BAD_REQUEST;
+	}
+	
+	loadev_buffer = (load_event_t*) malloc(sizeof(load_event_t) * (1 + end_timestamp - start_timestamp));
+	
+	if(loadev_buffer == NULL)
+		return MHD_HTTP_INTERNAL_SERVER_ERROR;
+	
+	qty = get_load_events(start_timestamp, end_timestamp, loadev_buffer, (1 + end_timestamp - start_timestamp));
+	
+	if(qty < 0) {
+		free(loadev_buffer);
+		return MHD_HTTP_INTERNAL_SERVER_ERROR;
+	}
+	
+	response_array = json_object_new_array();
+	
+	for(int i = 0; i < qty; i++) {
+		response_item = json_object_new_object();
+		
+		json_object_object_add_ex(response_item, "timestamp", json_object_new_int64(loadev_buffer[i].timestamp), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(response_item, "duration", json_object_new_int(loadev_buffer[i].duration), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(response_item, "delta_pt", json_object_new_double(loadev_buffer[i].delta_pt), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(response_item, "peak_pt", json_object_new_double(loadev_buffer[i].peak_pt), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(response_item, "top_appliance_id", json_object_new_int(loadev_buffer[i].top_appliance_id), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		
+		appliance_array = json_object_new_array();
+		json_object_array_add(appliance_array, json_object_new_double(loadev_buffer[i].delta_p[0]));
+		json_object_array_add(appliance_array, json_object_new_double(loadev_buffer[i].delta_p[1]));
+		
+		json_object_object_add_ex(response_item, "delta_p", appliance_array, JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		
+		appliance_array = json_object_new_array();
+		json_object_array_add(appliance_array, json_object_new_double(loadev_buffer[i].delta_q[0]));
+		json_object_array_add(appliance_array, json_object_new_double(loadev_buffer[i].delta_q[1]));
+		
+		json_object_object_add_ex(response_item, "delta_q", appliance_array, JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		
+		json_object_array_add(response_array, response_item);
+	}
+	
+	free(loadev_buffer);
+	
+	*resp_data = strdup(json_object_get_string(response_array));
+	
+	json_object_put(response_array);
+	
+	if(*resp_data == NULL)
+		return MHD_HTTP_INTERNAL_SERVER_ERROR;
+	
+	*resp_data_size = strlen(*resp_data);
 	*resp_content_type = strdup(JSON_CONTENT_TYPE);
 	
 	return MHD_HTTP_OK;
