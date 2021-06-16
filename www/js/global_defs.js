@@ -2,4 +2,7 @@ window.smceeApiUrlBase = window.location.protocol + "//" + window.location.hostn
 
 window.smceeNavbarMenuItems = [
 	{name: "Painel", href: "."},
+	{name: "Administração", adminOnly: true, dropdown: [
+		{name: "Aparelhos", href: "appliances.html"},
+	]}
 ];
