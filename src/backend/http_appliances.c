@@ -122,7 +122,7 @@ unsigned int http_handler_get_appliance_list(struct MHD_Connection *conn,
 	sqlite3 *db_conn = NULL;
 	sqlite3_stmt *ppstmt = NULL;
 	const char *str_ptr;
-	const char sql_get_appliances[] = "SELECT appliances.id,name,appliances.is_active,power,is_hardwired,appliances.creation_date,appliances.modification_date,IFNULL(signatures.qty, 0) AS signature_qty FROM appliances LEFT JOIN (SELECT appliance_id,COUNT(*) AS qty FROM signatures GROUP BY appliance_id) AS signatures ON signatures.appliance_id = appliances.id;";
+	const char sql_get_appliances[] = "SELECT appliances.id,name,appliances.creator_id,appliances.is_active,power,is_hardwired,appliances.creation_date,appliances.modification_date,IFNULL(signatures.qty, 0) AS signature_qty FROM appliances LEFT JOIN (SELECT appliance_id,COUNT(*) AS qty FROM signatures GROUP BY appliance_id) AS signatures ON signatures.appliance_id = appliances.id;";
 	
 	struct json_object* json_response = NULL;
 	struct json_object* json_appliance_item = NULL;
@@ -159,12 +159,13 @@ unsigned int http_handler_get_appliance_list(struct MHD_Connection *conn,
 			break;
 		
 		json_object_object_add_ex(json_appliance_item, "name", json_object_new_string(str_ptr), JSON_C_OBJECT_ADD_KEY_IS_NEW);
-		json_object_object_add_ex(json_appliance_item, "is_active", json_object_new_boolean(sqlite3_column_int(ppstmt, 2)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
-		json_object_object_add_ex(json_appliance_item, "power", json_object_new_double(sqlite3_column_double(ppstmt, 3)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
-		json_object_object_add_ex(json_appliance_item, "is_hardwired", json_object_new_boolean(sqlite3_column_int(ppstmt, 4)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
-		json_object_object_add_ex(json_appliance_item, "creation_date", json_object_new_int64(sqlite3_column_int64(ppstmt, 5)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
-		json_object_object_add_ex(json_appliance_item, "modification_date", json_object_new_int64(sqlite3_column_int64(ppstmt, 6)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
-		json_object_object_add_ex(json_appliance_item, "signature_qty", json_object_new_int(sqlite3_column_int(ppstmt, 7)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(json_appliance_item, "creator_id", json_object_new_int(sqlite3_column_int(ppstmt, 2)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(json_appliance_item, "is_active", json_object_new_boolean(sqlite3_column_int(ppstmt, 3)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(json_appliance_item, "power", json_object_new_double(sqlite3_column_double(ppstmt, 4)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(json_appliance_item, "is_hardwired", json_object_new_boolean(sqlite3_column_int(ppstmt, 5)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(json_appliance_item, "creation_date", json_object_new_int64(sqlite3_column_int64(ppstmt, 6)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(json_appliance_item, "modification_date", json_object_new_int64(sqlite3_column_int64(ppstmt, 7)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(json_appliance_item, "signature_qty", json_object_new_int(sqlite3_column_int(ppstmt, 8)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 	}
 	
 	sqlite3_finalize(ppstmt);
@@ -209,7 +210,7 @@ unsigned int http_handler_get_appliance(struct MHD_Connection *conn,
 	sqlite3 *db_conn = NULL;
 	sqlite3_stmt *ppstmt = NULL;
 	const char *str_ptr;
-	const char sql_get_appliance[] = "SELECT name,is_active,power,is_hardwired,creation_date,modification_date,signature_qty FROM appliances WHERE id = ?1;";
+	const char sql_get_appliance[] = "SELECT name,creator_id,is_active,power,is_hardwired,creation_date,modification_date,signature_qty FROM appliances WHERE id = ?1;";
 	int count = 0;
 	
 	struct json_object* json_response = NULL;
@@ -259,12 +260,13 @@ unsigned int http_handler_get_appliance(struct MHD_Connection *conn,
 			break;
 		
 		json_object_object_add_ex(json_response, "name", json_object_new_string(str_ptr), JSON_C_OBJECT_ADD_KEY_IS_NEW);
-		json_object_object_add_ex(json_response, "is_active", json_object_new_boolean(sqlite3_column_int(ppstmt, 1)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
-		json_object_object_add_ex(json_response, "power", json_object_new_double(sqlite3_column_double(ppstmt, 2)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
-		json_object_object_add_ex(json_response, "is_hardwired", json_object_new_boolean(sqlite3_column_int(ppstmt, 3)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
-		json_object_object_add_ex(json_response, "creation_date", json_object_new_int64(sqlite3_column_int64(ppstmt, 4)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
-		json_object_object_add_ex(json_response, "modification_date", json_object_new_int64(sqlite3_column_int64(ppstmt, 5)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
-		json_object_object_add_ex(json_response, "signature_qty", json_object_new_int(sqlite3_column_int(ppstmt, 6)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(json_response, "creator_id", json_object_new_int(sqlite3_column_int(ppstmt, 1)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(json_response, "is_active", json_object_new_boolean(sqlite3_column_int(ppstmt, 2)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(json_response, "power", json_object_new_double(sqlite3_column_double(ppstmt, 3)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(json_response, "is_hardwired", json_object_new_boolean(sqlite3_column_int(ppstmt, 4)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(json_response, "creation_date", json_object_new_int64(sqlite3_column_int64(ppstmt, 5)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(json_response, "modification_date", json_object_new_int64(sqlite3_column_int64(ppstmt, 6)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(json_response, "signature_qty", json_object_new_int(sqlite3_column_int(ppstmt, 7)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 	}
 	
 	sqlite3_finalize(ppstmt);
@@ -314,7 +316,7 @@ unsigned int http_handler_create_appliance(struct MHD_Connection *conn,
 	int result;
 	sqlite3 *db_conn = NULL;
 	sqlite3_stmt *ppstmt = NULL;
-	const char sql_get_appliance[] = "INSERT INTO appliances(name,is_active,power,is_hardwired,creation_date,modification_date) VALUES(?1, ?2, ?3, ?4, ?5, ?5);";
+	const char sql_get_appliance[] = "INSERT INTO appliances(name,creator_id,is_active,power,is_hardwired,creation_date,modification_date) VALUES(?1, ?2, ?3, ?4, ?5, ?5, ?6);";
 	int new_appliance_id;
 	
 	if(logged_user_id <= 0 || users_check_admin(logged_user_id) == 0)
@@ -363,10 +365,11 @@ unsigned int http_handler_create_appliance(struct MHD_Connection *conn,
 	
 	// SQLITE_OK é zero, então somando todos os resultados podemos saber se algum falhou
 	result = sqlite3_bind_text(ppstmt, 1, json_object_get_string(json_name), -1, SQLITE_STATIC);
-	result += sqlite3_bind_int(ppstmt, 2, json_object_get_boolean(json_is_active));
-	result += sqlite3_bind_double(ppstmt, 3, json_object_get_double(json_power));
-	result += sqlite3_bind_int(ppstmt, 4, json_object_get_boolean(json_is_hardwired));
-	result += sqlite3_bind_int64(ppstmt, 5, time(NULL));
+	result += sqlite3_bind_int(ppstmt, 2, logged_user_id);
+	result += sqlite3_bind_int(ppstmt, 3, json_object_get_boolean(json_is_active));
+	result += sqlite3_bind_double(ppstmt, 4, json_object_get_double(json_power));
+	result += sqlite3_bind_int(ppstmt, 5, json_object_get_boolean(json_is_hardwired));
+	result += sqlite3_bind_int64(ppstmt, 6, time(NULL));
 	
 	if(result) {
 		LOG_ERROR("Failed to bind appliance values to prepared statement.");
