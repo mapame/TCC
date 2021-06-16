@@ -865,14 +865,14 @@ unsigned int http_handler_add_appliance_signatures(struct MHD_Connection *conn,
 		
 		// SQLITE_OK é zero, então somando todos os resultados podemos saber se algum falhou
 		result = sqlite3_bind_int64(ppstmt, 4, json_object_get_int64(json_timestamp));
-		result += sqlite3_bind_int(ppstmt, 5, json_object_get_double(json_delta_pt));
-		result += sqlite3_bind_int(ppstmt, 6, json_object_get_double(json_peak_pt));
-		result += sqlite3_bind_int(ppstmt, 7, json_object_get_double(json_delta_pa));
-		result += sqlite3_bind_int(ppstmt, 8, json_object_get_double(json_delta_pb));
-		result += sqlite3_bind_int(ppstmt, 9, json_object_get_double(json_delta_sa));
-		result += sqlite3_bind_int(ppstmt, 10, json_object_get_double(json_delta_sb));
-		result += sqlite3_bind_int(ppstmt, 11, json_object_get_double(json_delta_qa));
-		result += sqlite3_bind_int(ppstmt, 12, json_object_get_double(json_delta_qb));
+		result += sqlite3_bind_double(ppstmt, 5, json_object_get_double(json_delta_pt));
+		result += sqlite3_bind_double(ppstmt, 6, json_object_get_double(json_peak_pt));
+		result += sqlite3_bind_double(ppstmt, 7, json_object_get_double(json_delta_pa));
+		result += sqlite3_bind_double(ppstmt, 8, json_object_get_double(json_delta_pb));
+		result += sqlite3_bind_double(ppstmt, 9, json_object_get_double(json_delta_sa));
+		result += sqlite3_bind_double(ppstmt, 10, json_object_get_double(json_delta_sb));
+		result += sqlite3_bind_double(ppstmt, 11, json_object_get_double(json_delta_qa));
+		result += sqlite3_bind_double(ppstmt, 12, json_object_get_double(json_delta_qb));
 		result += sqlite3_bind_int(ppstmt, 13, json_object_get_int(json_duration));
 		
 		if(result) {
