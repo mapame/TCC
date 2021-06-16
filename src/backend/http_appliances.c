@@ -59,6 +59,55 @@ static int check_appliance_id(int appliance_id) {
 	return count;
 }
 
+static int update_appliance_modification_date(int appliance_id) {
+	int result;
+	sqlite3 *db_conn = NULL;
+	sqlite3_stmt *ppstmt = NULL;
+	const char sql_update_appliance_mod_date[] = "UPDATE appliances SET modification_date = ?2 WHERE id = ?1;";
+	int count = 0;
+	
+	if(appliance_id <= 0)
+		return 0;
+	
+	if((result = sqlite3_open(DB_FILENAME, &db_conn)) != SQLITE_OK) {
+		LOG_ERROR("Failed to open database connection: %s", sqlite3_errstr(result));
+		sqlite3_close(db_conn);
+		
+		return -1;
+	}
+	
+	sqlite3_busy_timeout(db_conn, 1000);
+	
+	if((result = sqlite3_prepare_v2(db_conn, sql_update_appliance_mod_date, -1, &ppstmt, NULL)) != SQLITE_OK) {
+		LOG_ERROR("Failed to prepare SQL statement: %s", sqlite3_errstr(result));
+		sqlite3_close(db_conn);
+		
+		return -1;
+	}
+	
+	if(sqlite3_bind_int(ppstmt, 1, appliance_id) != SQLITE_OK || sqlite3_bind_int64(ppstmt, 2, time(NULL)) != SQLITE_OK) {
+		LOG_ERROR("Failed to bind values to prepared statement.");
+		sqlite3_finalize(ppstmt);
+		sqlite3_close(db_conn);
+		
+		return -1;
+	}
+	
+	while((result = sqlite3_step(ppstmt)) == SQLITE_ROW)
+		count++;
+	
+	sqlite3_finalize(ppstmt);
+	sqlite3_close(db_conn);
+	
+	if(result != SQLITE_DONE) {
+		LOG_ERROR("Failed to update the appliance modification date: %s", sqlite3_errstr(result));
+		
+		return -1;
+	}
+	
+	return count;
+}
+
 unsigned int http_handler_get_appliance_list(struct MHD_Connection *conn,
 											int logged_user_id,
 											path_parameter_t *path_parameters,
@@ -514,7 +563,7 @@ unsigned int http_handler_get_appliance_signature_list(struct MHD_Connection *co
 	int result;
 	sqlite3 *db_conn = NULL;
 	sqlite3_stmt *ppstmt = NULL;
-	const char sql_get_signatures[] = "SELECT timestamp,appliance_id,creator_id,date_added,delta_pt,peak_pt,delta_pa,delta_pb,delta_sa,delta_sb,delta_qa,delta_qb,duration FROM signatures WHERE NOT ?1 OR appliance_id = ?1;";
+	const char sql_get_signatures[] = "SELECT timestamp,appliance_id,creator_id,delta_pt,peak_pt,delta_pa,delta_pb,delta_sa,delta_sb,delta_qa,delta_qb,duration FROM signatures WHERE NOT ?1 OR appliance_id = ?1;";
 	
 	struct json_object* json_response = NULL;
 	struct json_object* json_signature_item = NULL;
@@ -572,27 +621,26 @@ unsigned int http_handler_get_appliance_signature_list(struct MHD_Connection *co
 		json_object_object_add_ex(json_signature_item, "timestamp", json_object_new_int64(sqlite3_column_int64(ppstmt, 0)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		json_object_object_add_ex(json_signature_item, "appliance_id", json_object_new_int(sqlite3_column_int(ppstmt, 1)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		json_object_object_add_ex(json_signature_item, "creator_id", json_object_new_int(sqlite3_column_int(ppstmt, 2)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
-		json_object_object_add_ex(json_signature_item, "date_added", json_object_new_int64(sqlite3_column_int64(ppstmt, 3)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		
-		json_object_object_add_ex(json_signature_item, "delta_pt", json_object_new_double(sqlite3_column_double(ppstmt, 4)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
-		json_object_object_add_ex(json_signature_item, "peak_pt", json_object_new_double(sqlite3_column_double(ppstmt, 5)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(json_signature_item, "delta_pt", json_object_new_double(sqlite3_column_double(ppstmt, 3)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(json_signature_item, "peak_pt", json_object_new_double(sqlite3_column_double(ppstmt, 4)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		
 		json_power_data_array = json_object_new_array_ext(2);
 		json_object_object_add_ex(json_signature_item, "delta_p", json_power_data_array, JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_array_add(json_power_data_array, json_object_new_double(sqlite3_column_double(ppstmt, 5)));
 		json_object_array_add(json_power_data_array, json_object_new_double(sqlite3_column_double(ppstmt, 6)));
-		json_object_array_add(json_power_data_array, json_object_new_double(sqlite3_column_double(ppstmt, 7)));
 		
 		json_power_data_array = json_object_new_array_ext(2);
 		json_object_object_add_ex(json_signature_item, "delta_s", json_power_data_array, JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_array_add(json_power_data_array, json_object_new_double(sqlite3_column_double(ppstmt, 7)));
 		json_object_array_add(json_power_data_array, json_object_new_double(sqlite3_column_double(ppstmt, 8)));
-		json_object_array_add(json_power_data_array, json_object_new_double(sqlite3_column_double(ppstmt, 9)));
 		
 		json_power_data_array = json_object_new_array_ext(2);
 		json_object_object_add_ex(json_signature_item, "delta_q", json_power_data_array, JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_array_add(json_power_data_array, json_object_new_double(sqlite3_column_double(ppstmt, 9)));
 		json_object_array_add(json_power_data_array, json_object_new_double(sqlite3_column_double(ppstmt, 10)));
-		json_object_array_add(json_power_data_array, json_object_new_double(sqlite3_column_double(ppstmt, 11)));
 		
-		json_object_object_add_ex(json_signature_item, "duration", json_object_new_int(sqlite3_column_int(ppstmt, 12)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(json_signature_item, "duration", json_object_new_int(sqlite3_column_int(ppstmt, 11)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 	}
 	
 	sqlite3_finalize(ppstmt);
@@ -636,7 +684,7 @@ unsigned int http_handler_get_appliance_signature(struct MHD_Connection *conn,
 	int result;
 	sqlite3 *db_conn = NULL;
 	sqlite3_stmt *ppstmt = NULL;
-	const char sql_get_signature[] = "SELECT appliance_id,creator_id,date_added,delta_pt,peak_pt,delta_pa,delta_pb,delta_sa,delta_sb,delta_qa,delta_qb,duration FROM signatures WHERE timestamp = ?1;";
+	const char sql_get_signature[] = "SELECT appliance_id,creator_id,delta_pt,peak_pt,delta_pa,delta_pb,delta_sa,delta_sb,delta_qa,delta_qb,duration FROM signatures WHERE timestamp = ?1;";
 	int count = 0;
 	
 	struct json_object *json_response;
@@ -684,27 +732,26 @@ unsigned int http_handler_get_appliance_signature(struct MHD_Connection *conn,
 		json_object_object_add_ex(json_response, "timestamp", json_object_new_int64(signature_timestamp), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		json_object_object_add_ex(json_response, "appliance_id", json_object_new_int(sqlite3_column_int(ppstmt, 0)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		json_object_object_add_ex(json_response, "creator_id", json_object_new_int(sqlite3_column_int(ppstmt, 1)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
-		json_object_object_add_ex(json_response, "date_added", json_object_new_int64(sqlite3_column_int64(ppstmt, 2)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		
-		json_object_object_add_ex(json_response, "delta_pt", json_object_new_double(sqlite3_column_double(ppstmt, 3)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
-		json_object_object_add_ex(json_response, "peak_pt", json_object_new_double(sqlite3_column_double(ppstmt, 4)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(json_response, "delta_pt", json_object_new_double(sqlite3_column_double(ppstmt, 2)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(json_response, "peak_pt", json_object_new_double(sqlite3_column_double(ppstmt, 3)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		
 		json_power_data_array = json_object_new_array_ext(2);
 		json_object_object_add_ex(json_response, "delta_p", json_power_data_array, JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_array_add(json_power_data_array, json_object_new_double(sqlite3_column_double(ppstmt, 4)));
 		json_object_array_add(json_power_data_array, json_object_new_double(sqlite3_column_double(ppstmt, 5)));
-		json_object_array_add(json_power_data_array, json_object_new_double(sqlite3_column_double(ppstmt, 6)));
 		
 		json_power_data_array = json_object_new_array_ext(2);
 		json_object_object_add_ex(json_response, "delta_s", json_power_data_array, JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_array_add(json_power_data_array, json_object_new_double(sqlite3_column_double(ppstmt, 6)));
 		json_object_array_add(json_power_data_array, json_object_new_double(sqlite3_column_double(ppstmt, 7)));
-		json_object_array_add(json_power_data_array, json_object_new_double(sqlite3_column_double(ppstmt, 8)));
 		
 		json_power_data_array = json_object_new_array_ext(2);
 		json_object_object_add_ex(json_response, "delta_q", json_power_data_array, JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_array_add(json_power_data_array, json_object_new_double(sqlite3_column_double(ppstmt, 8)));
 		json_object_array_add(json_power_data_array, json_object_new_double(sqlite3_column_double(ppstmt, 9)));
-		json_object_array_add(json_power_data_array, json_object_new_double(sqlite3_column_double(ppstmt, 10)));
 		
-		json_object_object_add_ex(json_response, "duration", json_object_new_int(sqlite3_column_int(ppstmt, 11)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(json_response, "duration", json_object_new_int(sqlite3_column_int(ppstmt, 10)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 	}
 	
 	sqlite3_finalize(ppstmt);
@@ -760,7 +807,7 @@ unsigned int http_handler_add_appliance_signatures(struct MHD_Connection *conn,
 	int result;
 	sqlite3 *db_conn = NULL;
 	sqlite3_stmt *ppstmt = NULL;
-	const char sql_insert_signature[] = "INSERT OR REPLACE INTO signatures(appliance_id,creator_id,date_added,timestamp,delta_pt,peak_pt,delta_pa,delta_pb,delta_sa,delta_sb,delta_qa,delta_qb,duration) VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13);";
+	const char sql_insert_signature[] = "INSERT OR REPLACE INTO signatures(appliance_id,creator_id,timestamp,delta_pt,peak_pt,delta_pa,delta_pb,delta_sa,delta_sb,delta_qa,delta_qb,duration) VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12);";
 	int insert_counter = 0;
 	
 	if(logged_user_id <= 0 || users_check_admin(logged_user_id) == 0)
@@ -811,7 +858,6 @@ unsigned int http_handler_add_appliance_signatures(struct MHD_Connection *conn,
 	
 	result = sqlite3_bind_int(ppstmt, 1, appliance_id);
 	result += sqlite3_bind_int(ppstmt, 2, logged_user_id);
-	result += sqlite3_bind_int64(ppstmt, 3, time(NULL));
 	
 	if(result) {
 		LOG_ERROR("Failed to bind appliance values to prepared statement.");
@@ -864,16 +910,16 @@ unsigned int http_handler_add_appliance_signatures(struct MHD_Connection *conn,
 		}
 		
 		// SQLITE_OK é zero, então somando todos os resultados podemos saber se algum falhou
-		result = sqlite3_bind_int64(ppstmt, 4, json_object_get_int64(json_timestamp));
-		result += sqlite3_bind_double(ppstmt, 5, json_object_get_double(json_delta_pt));
-		result += sqlite3_bind_double(ppstmt, 6, json_object_get_double(json_peak_pt));
-		result += sqlite3_bind_double(ppstmt, 7, json_object_get_double(json_delta_pa));
-		result += sqlite3_bind_double(ppstmt, 8, json_object_get_double(json_delta_pb));
-		result += sqlite3_bind_double(ppstmt, 9, json_object_get_double(json_delta_sa));
-		result += sqlite3_bind_double(ppstmt, 10, json_object_get_double(json_delta_sb));
-		result += sqlite3_bind_double(ppstmt, 11, json_object_get_double(json_delta_qa));
-		result += sqlite3_bind_double(ppstmt, 12, json_object_get_double(json_delta_qb));
-		result += sqlite3_bind_int(ppstmt, 13, json_object_get_int(json_duration));
+		result = sqlite3_bind_int64(ppstmt, 3, json_object_get_int64(json_timestamp));
+		result += sqlite3_bind_double(ppstmt, 4, json_object_get_double(json_delta_pt));
+		result += sqlite3_bind_double(ppstmt, 5, json_object_get_double(json_peak_pt));
+		result += sqlite3_bind_double(ppstmt, 6, json_object_get_double(json_delta_pa));
+		result += sqlite3_bind_double(ppstmt, 7, json_object_get_double(json_delta_pb));
+		result += sqlite3_bind_double(ppstmt, 8, json_object_get_double(json_delta_sa));
+		result += sqlite3_bind_double(ppstmt, 9, json_object_get_double(json_delta_sb));
+		result += sqlite3_bind_double(ppstmt, 10, json_object_get_double(json_delta_qa));
+		result += sqlite3_bind_double(ppstmt, 11, json_object_get_double(json_delta_qb));
+		result += sqlite3_bind_int(ppstmt, 12, json_object_get_int(json_duration));
 		
 		if(result) {
 			LOG_ERROR("Failed to bind appliance values to prepared statement.");
@@ -902,6 +948,9 @@ unsigned int http_handler_add_appliance_signatures(struct MHD_Connection *conn,
 	sqlite3_close(db_conn);
 	
 	json_object_put(received_json);
+	
+	if(insert_counter > 0)
+		update_appliance_modification_date(appliance_id);
 	
 	if((*resp_data = malloc(sizeof(char) * 128)) == NULL)
 		return MHD_HTTP_INTERNAL_SERVER_ERROR;
@@ -932,7 +981,8 @@ unsigned int http_handler_delete_appliance_signature(struct MHD_Connection *conn
 	int result;
 	sqlite3 *db_conn = NULL;
 	sqlite3_stmt *ppstmt = NULL;
-	const char sql_delete_signature[] = "DELETE FROM signatures WHERE timestamp = ?1;";
+	const char sql_delete_signature[] = "DELETE FROM signatures WHERE timestamp = ?1 RETURNING appliance_id;";
+	int deleted_signature_appliance_id = 0;
 	int changes = 0;
 	
 	if(logged_user_id <= 0)
@@ -968,7 +1018,8 @@ unsigned int http_handler_delete_appliance_signature(struct MHD_Connection *conn
 		return MHD_HTTP_INTERNAL_SERVER_ERROR;
 	}
 	
-	result = sqlite3_step(ppstmt);
+	while((result = sqlite3_step(ppstmt)) == SQLITE_ROW)
+		deleted_signature_appliance_id = sqlite3_column_int(ppstmt, 0);
 	
 	changes = sqlite3_changes(db_conn);
 	
@@ -983,6 +1034,8 @@ unsigned int http_handler_delete_appliance_signature(struct MHD_Connection *conn
 	
 	if(changes == 0)
 		return MHD_HTTP_NOT_FOUND;
+	
+	update_appliance_modification_date(deleted_signature_appliance_id);
 	
 	return MHD_HTTP_OK;
 }
