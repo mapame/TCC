@@ -51,7 +51,7 @@ static int check_appliance_id(int appliance_id) {
 	sqlite3_close(db_conn);
 	
 	if(result != SQLITE_DONE) {
-		LOG_ERROR("Failed to read appliance signatures: %s", sqlite3_errstr(result));
+		LOG_ERROR("Failed to check appliance ID: %s", sqlite3_errstr(result));
 		
 		return -1;
 	}
@@ -891,19 +891,33 @@ unsigned int http_handler_add_appliance_signatures(struct MHD_Connection *conn,
 		json_object_object_get_ex(received_json_item, "duration", &json_duration);
 		
 		if(json_object_get_type(json_timestamp) != json_type_int || json_object_get_int64(json_timestamp) <= 0
-			|| json_object_get_type(json_delta_pt) != json_type_double
-			|| json_object_get_type(json_peak_pt) != json_type_double
+			|| (json_object_get_type(json_delta_pt) != json_type_double && json_object_get_type(json_delta_pt) != json_type_int)
+			|| (json_object_get_type(json_peak_pt) != json_type_double && json_object_get_type(json_peak_pt) != json_type_int)
 			|| json_object_get_type(json_delta_p) != json_type_array || json_object_array_length(json_delta_p) != 2
 			|| json_object_get_type(json_delta_s) != json_type_array || json_object_array_length(json_delta_s) != 2
 			|| json_object_get_type(json_delta_q) != json_type_array || json_object_array_length(json_delta_q) != 2
-			|| json_object_get_type(json_duration) != json_type_int
-			|| json_object_get_type(json_delta_pa = json_object_array_get_idx(json_delta_p, 0)) != json_type_double
-			|| json_object_get_type(json_delta_pb = json_object_array_get_idx(json_delta_p, 1)) != json_type_double
-			|| json_object_get_type(json_delta_sa = json_object_array_get_idx(json_delta_s, 0)) != json_type_double
-			|| json_object_get_type(json_delta_sb = json_object_array_get_idx(json_delta_s, 1)) != json_type_double
-			|| json_object_get_type(json_delta_qa = json_object_array_get_idx(json_delta_q, 0)) != json_type_double
-			|| json_object_get_type(json_delta_qb = json_object_array_get_idx(json_delta_q, 1)) != json_type_double
-			) {
+			|| json_object_get_type(json_duration) != json_type_int) {
+			
+			sqlite3_finalize(ppstmt);
+			sqlite3_close(db_conn);
+			json_object_put(received_json);
+			
+			return MHD_HTTP_BAD_REQUEST;
+		}
+		
+		json_delta_pa = json_object_array_get_idx(json_delta_p, 0);
+		json_delta_pb = json_object_array_get_idx(json_delta_p, 1);
+		json_delta_sa = json_object_array_get_idx(json_delta_s, 0);
+		json_delta_sb = json_object_array_get_idx(json_delta_s, 1);
+		json_delta_qa = json_object_array_get_idx(json_delta_q, 0);
+		json_delta_qb = json_object_array_get_idx(json_delta_q, 1);
+		
+		if(		(json_object_get_type(json_delta_pa) != json_type_double && json_object_get_type(json_delta_pa) != json_type_int)
+			||	(json_object_get_type(json_delta_pb) != json_type_double && json_object_get_type(json_delta_pb) != json_type_int)
+			||	(json_object_get_type(json_delta_sa) != json_type_double && json_object_get_type(json_delta_sa) != json_type_int)
+			||	(json_object_get_type(json_delta_sb) != json_type_double && json_object_get_type(json_delta_sb) != json_type_int)
+			||	(json_object_get_type(json_delta_qa) != json_type_double && json_object_get_type(json_delta_qa) != json_type_int)
+			||	(json_object_get_type(json_delta_qb) != json_type_double && json_object_get_type(json_delta_qb) != json_type_int)) {
 			
 			sqlite3_finalize(ppstmt);
 			sqlite3_close(db_conn);
