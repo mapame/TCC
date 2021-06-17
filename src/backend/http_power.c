@@ -13,6 +13,7 @@
 
 enum power_get_type {
 	POWER_GET_PT,
+	POWER_GET_PTV,
 	POWER_GET_V,
 	POWER_GET_I,
 	POWER_GET_P,
@@ -47,6 +48,8 @@ unsigned int http_handler_get_power_data(struct MHD_Connection *conn,
 	
 	if(type_str == NULL || !strcmp(type_str, "pt"))
 		type = POWER_GET_PT;
+	else if(!strcmp(type_str, "ptv"))
+		type = POWER_GET_PTV;
 	else if(!strcmp(type_str, "v"))
 		type = POWER_GET_V;
 	else if(!strcmp(type_str, "p"))
@@ -106,7 +109,9 @@ unsigned int http_handler_get_power_data(struct MHD_Connection *conn,
 	
 	for(int i = 0; i < pd_qty; i++) {
 		if(type == POWER_GET_PT)
-			*resp_data_size += sprintf(&(*resp_data)[*resp_data_size], "[%ld,%.2lf],", pd_buffer[i].timestamp, pd_buffer[i].p[0] + pd_buffer[i].p[1]);
+			*resp_data_size += sprintf(&(*resp_data)[*resp_data_size], "[%ld,%.2lf],", pd_buffer[i].timestamp, (pd_buffer[i].p[0] + pd_buffer[i].p[1]));
+		else if(type == POWER_GET_PTV)
+			*resp_data_size += sprintf(&(*resp_data)[*resp_data_size], "[%ld,%.2lf,%.2lf,%.2lf],", pd_buffer[i].timestamp, (pd_buffer[i].p[0] + pd_buffer[i].p[1]), pd_buffer[i].v[0], pd_buffer[i].v[1]);
 		else if(type == POWER_GET_V)
 			*resp_data_size += sprintf(&(*resp_data)[*resp_data_size], "[%ld,%.2lf,%.2lf],", pd_buffer[i].timestamp, pd_buffer[i].v[0], pd_buffer[i].v[1]);
 		else if(type == POWER_GET_P)
