@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+	
+	<link rel="icon" href="favicon.png">
+	<link href="css/materialdesignicons.min.css" media="all" rel="stylesheet" type="text/css">
+	<link rel="stylesheet" href="css/bulma.min.css">
+	<link rel="stylesheet" href="css/dygraph.css">
+	
+	<script src="js/dygraph.min.js"></script>
+	
+	<script src="js/ui_components.js"></script>
+	<script src="js/global_defs.js"></script>
+	<script src="js/auth.js"></script>
+	<script src="js/user_info.js"></script>
+	<script src="js/navbar.js"></script>
+	
+	<script src="js/signatures_page.js"></script>
+	
+	<title>SMCEE - Assinaturas de aparelhos</title>
+</head>
+<body>
+	<nav class="navbar is-dark" role="navigation" aria-label="main navigation">
+		<div class="navbar-brand">
+			<a class="navbar-item" href="./">
+				<img src="img/logo.png">
+			</a>
+			<a role="button" class="navbar-burger" data-target="main-menu"></a>
+		</div>
+		<div id="main-menu" class="navbar-menu">
+		</div>
+	</nav>
+	<div class="section">
+		<div class="container is-max-desktop">
+			<div class="level mb-3">
+				<div class="level-left">
+					<div class="level-item">
+						<div class="buttons">
+							<button class="button is-primary is-loading" id="button-add-signatures"><span class="icon"><i class="mdi mdi-18px mdi-plus"></i></span><span>Adicionar</span></button>
+							<button class="button is-danger" id="button-delete-signatures"><span class="icon"><i class="mdi mdi-18px mdi-trash-can-outline"></i></span><span>Deletar selecionadas</span></button>
+						</div>
+					</div>
+				</div>
+				<div class="level-right">
+					<div class="level-item">
+						<div class="select is-fullwidth">
+							<select id="appliance-filter-select">
+								<option value="0" selected>Todos os aparelhos</option>
+							</select>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="table-container">
+				<table class="table is-fullwidth is-hoverable">
+					<thead>
+						<tr class="is-hidden-mobile">
+							<th colspan="4" style="border-width: 0;"></th>
+							<th class="has-text-centered" colspan="5">Potência</th>
+						</tr>
+						<tr>
+							<th><input type="checkbox" id="select-all-checkbox" autocomplete="off"></th>
+							<th class="has-text-centered">Data</th>
+							<th class="has-text-centered">Aparelho</th>
+							<th class="has-text-centered is-hidden-mobile">Duração (seg)</th>
+							<th class="has-text-centered">Total (W)</th>
+							<th class="has-text-centered is-hidden-mobile">Pico (W)</th>
+							<th class="has-text-centered is-hidden-mobile">Ativa (W)</th>
+							<th class="has-text-centered is-hidden-mobile">Aparente (VA)</th>
+							<th class="has-text-centered is-hidden-mobile">Reativa (VAr)</th>
+						</tr>
+					</thead>
+					<tbody id="signature-tbody">
+					</tbody>
+				</table>
+			</div>
+		</div>
+	</div>
+	<div class="modal" id="modal-add-signatures">
+		<div class="modal-background"></div>
+		<div class="modal-card">
+			<header class="modal-card-head">
+				<p class="modal-card-title">Adicionar assinaturas</p>
+			</header>
+			<section class="modal-card-body">
+				<div style="width: 100%;" id="signature-power-chart"></div>
+				<div class="is-clearfix mt-3">
+					<button class="button is-primary is-small is-loading is-pulled-right" id="button-more-hours"><span class="icon"><i class="mdi mdi-clock-end"></i></span>Mostrar mais tempo<span id="button-more-hours-label">&nbsp;(8h)</span></button>
+				</div>
+				<div class="select is-fullwidth mt-4">
+					<select id="new-signature-appliance-select">
+						<option value="0" selected>Aparelho</option>
+					</select>
+				</div>
+			</section>
+			<footer class="modal-card-foot">
+				<button class="button is-success" id="button-submit-signatures"><span class="icon"><i class="mdi mdi-content-save"></i></span><span id="submit-signatures-text">Salvar</span></button>
+				<button class="button is-danger" id="button-discard-signatures"><span class="icon"><i class="mdi mdi-cancel"></i></span><span>Cancelar</span></button>
+			</footer>
+		</div>
+	</div>
+	<div class="modal" id="modal-delete-signatures">
+		<div class="modal-background"></div>
+		<div class="modal-card">
+			<header class="modal-card-head">
+				<p class="modal-card-title" id="modal-title-delete-signatures">Deletar assinaturas?</p>
+			</header>
+			<section class="modal-card-body">
+				<progress class="progress is-danger" id="signature-delete-progress" value="0" max="100">0%</progress>
+			</section>
+			<footer class="modal-card-foot">
+				<button class="button is-success" id="button-confirm-del-signatures"><span class="icon"><i class="mdi mdi-trash-can-outline"></i></span><span id="submit-signatures-text">Deletar</span></button>
+				<button class="button is-danger" id="button-cancel-del-signatures"><span class="icon"><i class="mdi mdi-cancel"></i></span><span>Cancelar</span></button>
+			</footer>
+		</div>
+	</div>
+</body>
+</html>

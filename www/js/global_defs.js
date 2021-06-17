@@ -4,5 +4,6 @@ window.smceeNavbarMenuItems = [
 	{name: "Painel", href: "."},
 	{name: "Administração", adminOnly: true, dropdown: [
 		{name: "Aparelhos", href: "appliances.html"},
+		{name: "Assinaturas", href: "signatures.html"},
 	]}
 ];
