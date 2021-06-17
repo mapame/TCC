@@ -120,7 +120,7 @@ function navbarPopulateItems(navbarContainerId) {
 			let usernameAdminIcon = document.createElement("i");
 			
 			usernameAdminIconContainer.className = "icon is-small";
-			usernameAdminIcon.className = "mdi mdi-crown";
+			usernameAdminIcon.className = "mdi mdi-18px mdi-crown";
 			
 			usernameAdminIconContainer.appendChild(usernameAdminIcon);
 			usernameTag.appendChild(usernameAdminIconContainer);

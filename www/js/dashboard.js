@@ -61,6 +61,7 @@ window.onload = function() {
 			drawPoints: false,
 			legend: "never",
 			includeZero: true,
+			strokeWidth: 1.2,
 			axes: {
 				y: {
 					axisLabelFormatter: function(x) { return x + " W"; }
@@ -91,10 +92,7 @@ function dashboardPowerGraphAddData(timestamp, power) {
 			window.dashboardPowerData.push([new Date(missingTimestamp * 1000), null]);
 	}
 	
-	window.dashboardPowerData.push([
-		new Date(timestamp * 1000),
-		power
-	]);
+	window.dashboardPowerData.push([new Date(timestamp * 1000), power]);
 	
 	if(window.dashboardPowerData.length > 3600)
 		window.dashboardPowerData = window.dashboardPowerData.slice(window.dashboardPowerData.length - 3600);

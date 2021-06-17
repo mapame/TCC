@@ -3,6 +3,8 @@ window.onload = function () {
 	authCheckAccessKey(redirectBack, null);
 	
 	document.getElementById("submit-button").onclick = submitLogin;
+	
+	document.getElementById("username-field").focus();
 };
 
 function redirectBack() {
