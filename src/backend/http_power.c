@@ -218,6 +218,12 @@ unsigned int http_handler_get_load_events(struct MHD_Connection *conn,
 		json_object_object_add_ex(response_item, "delta_p", appliance_array, JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		
 		appliance_array = json_object_new_array();
+		json_object_array_add(appliance_array, json_object_new_double(loadev_buffer[i].delta_s[0]));
+		json_object_array_add(appliance_array, json_object_new_double(loadev_buffer[i].delta_s[1]));
+		
+		json_object_object_add_ex(response_item, "delta_s", appliance_array, JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		
+		appliance_array = json_object_new_array();
 		json_object_array_add(appliance_array, json_object_new_double(loadev_buffer[i].delta_q[0]));
 		json_object_array_add(appliance_array, json_object_new_double(loadev_buffer[i].delta_q[1]));
 		
