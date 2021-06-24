@@ -14,7 +14,7 @@
 #include "communication.h"
 #include "power.h"
 #include "energy.h"
-#include "device_events.h"
+#include "meter_events.h"
 #include "database.h"
 
 #define COMM_PORT 2048
