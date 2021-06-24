@@ -3,6 +3,7 @@ window.smceeApiUrlBase = window.location.protocol + "//" + window.location.hostn
 window.smceeNavbarMenuItems = [
 	{name: "Gráficos", dropdown: [
 		{name: "Potência/Tensão", href: "power_chart.html"},
+		{name: "Assinaturas", href: "signature_chart.html"},
 		{name: null},
 		{name: "Energia (minutos)", href: "energy_minute_chart.html"},
 		{name: "Energia (horas)", href: "energy_hour_chart.html"},
