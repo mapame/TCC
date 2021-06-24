@@ -165,7 +165,7 @@ void *data_acquisition_loop(void *argp) {
 					}
 					
 					if(sscanf(received_parameters[0], "%li", &e_timestamp) == 1 && strlen(received_parameters[1]) > 0) {
-						store_device_event_db(e_timestamp, received_parameters[1]);
+						store_meter_event_db(e_timestamp, received_parameters[1]);
 					} else {
 						LOG_WARN("Failed to parse event response from device.");
 					}
