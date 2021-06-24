@@ -21,8 +21,6 @@ function initPage() {
 	document.getElementById("button-confirm-del-signatures").onclick = startSignatureDeletion;
 	document.getElementById("button-cancel-del-signatures").onclick = modalCloseAll;
 	
-	fetchApplianceList();
-	
 	window.smceeNewSignaturePowerChart = new Dygraph(document.getElementById("signature-power-chart"), [[0, null]], {
 		labels: ["Hora", "Potência"],
 		xValueParser: function(x) {return x;},
@@ -381,6 +379,8 @@ function fetchPowerEvents(secondQty) {
 			document.getElementById("button-add-signatures").classList.remove("is-loading");
 			document.getElementById("button-more-hours").classList.remove("is-loading");
 			
+			updateAnnotations();
+			
 		} else if(this.status === 401) {
 			redirectToLogin();
 		} else {
@@ -410,8 +410,8 @@ function updateAnnotations() {
 			icon: (window.smceeSelectedEvents.has(eventItem.timestamp) ? "img/checkbox-marked-outline.png" : (window.smceeSignatures.has(eventItem.timestamp) ? "img/checkbox-blank-badge-outline.png" : "img/checkbox-blank-outline.png")),
 			width: 16,
 			height: 16,
-			text: eventItem.appliance_ids[0] + "(" + (eventItem.appliance_probs[0] * 100).toFixed(1) + "), " + eventItem.appliance_ids[1] + "(" + (eventItem.appliance_probs[1] * 100).toFixed(1) + "), " + eventItem.appliance_ids[2] + "(" + (eventItem.appliance_probs[2] * 100).toFixed(1) + ")\navg: " + (eventItem.prob_avg * 100).toFixed(1) + ", sd: " + (eventItem.prob_sd * 100).toFixed(1) + "\nd: " + eventItem.duration + " secs\ndP: " + eventItem.delta_pt.toFixed(1) + " W (" + eventItem.delta_p[0].toFixed(1) + " | " + eventItem.delta_p[1].toFixed(1) + ")\ndQ: " + eventItem.delta_q[0].toFixed(1) + " | " + eventItem.delta_q[1].toFixed(1) + " VAr",
-			tickColor:  (eventItem.delta_pt > 0) ? "orange" : "blue",
+			text: "dur: " + eventItem.duration + " secs\ndP: " + eventItem.delta_pt.toFixed(1) + " W (" + eventItem.delta_p[0].toFixed(1) + " | " + eventItem.delta_p[1].toFixed(1) + ")\ndQ: " + eventItem.delta_q[0].toFixed(1) + " | " + eventItem.delta_q[1].toFixed(1) + " VAr",
+			//tickColor:  (eventItem.delta_pt > 0) ? "orange" : "blue",
 			tickHeight: 10,
 		});
 	}
