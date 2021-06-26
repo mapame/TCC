@@ -7,13 +7,13 @@
 #include "logger.h"
 #include "database.h"
 
-int store_meter_event_db(time_t timestamp, const char *description) {
+int store_meter_event_db(time_t timestamp, const char *type) {
 	int result;
 	sqlite3 *db_conn = NULL;
 	sqlite3_stmt *ppstmt = NULL;
-	const char sql_store_event[] = "INSERT INTO meter_events(timestamp,description) VALUES(?1,?2);";
+	const char sql_store_event[] = "INSERT INTO meter_events(timestamp,type) VALUES(?1,?2) ON CONFLICT(timestamp,type) DO UPDATE SET count = count + 1;";
 	
-	if(description == NULL)
+	if(type == NULL)
 		return -1;
 	
 	if((result = sqlite3_open(DB_FILENAME, &db_conn)) != SQLITE_OK) {
@@ -33,7 +33,7 @@ int store_meter_event_db(time_t timestamp, const char *description) {
 	}
 	
 	result = sqlite3_bind_int64(ppstmt, 1, timestamp);
-	result += sqlite3_bind_text(ppstmt, 2, description, -1, SQLITE_STATIC);
+	result += sqlite3_bind_text(ppstmt, 2, type, -1, SQLITE_STATIC);
 	
 	if(result) {
 		LOG_ERROR("Failed to bind value to prepared statement.");
