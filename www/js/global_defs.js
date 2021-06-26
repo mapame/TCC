@@ -12,7 +12,7 @@ window.smceeNavbarMenuItems = [
 	{name: "Administração", adminOnly: true, dropdown: [
 		{name: "Usuários", href: "users.html"},
 		{name: "Configurações", href: "config.html"},
-		{name: "Eventos do Medidor", href: "events.html"},
+		{name: "Eventos do Medidor", href: "meter_events.html"},
 		{name: null},
 		{name: "Tarifas", href: "rates.html"},
 		{name: "Aparelhos", href: "appliances.html"},

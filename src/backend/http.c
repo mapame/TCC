@@ -111,6 +111,15 @@ static const path_segment_t url_path_tree = {
 				{}
 			}
 		},{
+			.text = "meter",
+			.children = (const path_segment_t[]) {
+				{
+					.text = "events",
+					.get_handler = http_handler_get_meter_events,
+				},
+				{}
+			}
+		},{
 			.text = "dashboard",
 			.get_handler = http_handler_get_dashboard_data
 		},{
