@@ -65,12 +65,8 @@ function updateTypeFilterSelect() {
 	if(typeof window.smceeMeterEvents != "object")
 		return;
 	
-	for(const event of window.smceeMeterEvents) {
-		if(meterEventTypes.has(event.type))
-			meterEventTypes.set(event.type, meterEventTypes.get(event.type) + 1);
-		else
-			meterEventTypes.set(event.type, 1);
-	}
+	for(const event of window.smceeMeterEvents)
+		meterEventTypes.set(event.type, (meterEventTypes.has(event.type) ? meterEventTypes.get(event.type) : 0) + event.count);
 	
 	while(selectElement.childElementCount > 1)
 		selectElement.removeChild(selectElement.lastChild);
@@ -79,7 +75,7 @@ function updateTypeFilterSelect() {
 	
 	for(const [typeName, typeCount] of meterEventTypes) {
 		selectOption = document.createElement("option");
-		selectOption.innerText = typeName + " (x" + typeCount + ")";
+		selectOption.innerText = typeName + " (" + typeCount + ")";
 		selectOption.value = typeName;
 		
 		selectElement.appendChild(selectOption);
