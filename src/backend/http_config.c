@@ -24,7 +24,7 @@ unsigned int http_handler_get_config_list(struct MHD_Connection *conn,
 	sqlite3 *db_conn = NULL;
 	sqlite3_stmt *ppstmt = NULL;
 	const char *str_ptr;
-	const char sql_get_configs[] = "SELECT name,value,description,modification_date FROM configs;";
+	const char sql_get_configs[] = "SELECT key,value,name,description,modification_date FROM configs;";
 	
 	struct json_object* json_response = NULL;
 	struct json_object* json_config_item = NULL;
@@ -58,7 +58,7 @@ unsigned int http_handler_get_config_list(struct MHD_Connection *conn,
 		if((str_ptr = (const char*) sqlite3_column_text(ppstmt, 0)) == NULL)
 			break;
 		
-		json_object_object_add_ex(json_config_item, "name", json_object_new_string(str_ptr), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(json_config_item, "key", json_object_new_string(str_ptr), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		
 		if((str_ptr = (const char*) sqlite3_column_text(ppstmt, 1)) == NULL)
 			break;
@@ -66,6 +66,11 @@ unsigned int http_handler_get_config_list(struct MHD_Connection *conn,
 		json_object_object_add_ex(json_config_item, "value", json_object_new_string(str_ptr), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		
 		if((str_ptr = (const char*) sqlite3_column_text(ppstmt, 2)) == NULL)
+			break;
+		
+		json_object_object_add_ex(json_config_item, "name", json_object_new_string(str_ptr), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		
+		if((str_ptr = (const char*) sqlite3_column_text(ppstmt, 3)) == NULL)
 			break;
 		
 		json_object_object_add_ex(json_config_item, "description", json_object_new_string(str_ptr), JSON_C_OBJECT_ADD_KEY_IS_NEW);
@@ -108,13 +113,13 @@ unsigned int http_handler_get_config(struct MHD_Connection *conn,
 											size_t *resp_data_size,
 											void *arg) {
 	
-	const char *config_name_str;
+	const char *config_key_str;
 	
 	int result;
 	sqlite3 *db_conn = NULL;
 	sqlite3_stmt *ppstmt = NULL;
 	const char *str_ptr;
-	const char sql_get_config[] = "SELECT name,value,description,modification_date FROM configs WHERE name = ?1;";
+	const char sql_get_config[] = "SELECT value,name,description,modification_date FROM configs WHERE key = ?1;";
 	int count = 0;
 	
 	struct json_object* json_response = NULL;
@@ -122,7 +127,7 @@ unsigned int http_handler_get_config(struct MHD_Connection *conn,
 	if(logged_user_id <= 0)
 		return MHD_HTTP_UNAUTHORIZED;
 	
-	if((config_name_str = http_parameter_get_value(path_parameters, 2)) == NULL || strlen(config_name_str) < 2)
+	if((config_key_str = http_parameter_get_value(path_parameters, 2)) == NULL || strlen(config_key_str) < 1)
 		return MHD_HTTP_BAD_REQUEST;
 	
 	if((result = sqlite3_open(DB_FILENAME, &db_conn)) != SQLITE_OK) {
@@ -141,7 +146,7 @@ unsigned int http_handler_get_config(struct MHD_Connection *conn,
 		return MHD_HTTP_INTERNAL_SERVER_ERROR;
 	}
 	
-	if((result = sqlite3_bind_text(ppstmt, 1, config_name_str, -1, SQLITE_STATIC)) != SQLITE_OK) {
+	if((result = sqlite3_bind_text(ppstmt, 1, config_key_str, -1, SQLITE_STATIC)) != SQLITE_OK) {
 		LOG_ERROR("Failed to bind value to prepared statement: %s", sqlite3_errstr(result));
 		sqlite3_finalize(ppstmt);
 		sqlite3_close(db_conn);
@@ -155,15 +160,17 @@ unsigned int http_handler_get_config(struct MHD_Connection *conn,
 		if(count++)
 			continue;
 		
+		json_object_object_add_ex(json_response, "key", json_object_new_string(config_key_str), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		
 		if((str_ptr = (const char*) sqlite3_column_text(ppstmt, 0)) == NULL)
 			break;
 		
-		json_object_object_add_ex(json_response, "name", json_object_new_string(str_ptr), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(json_response, "value", json_object_new_string(str_ptr), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		
 		if((str_ptr = (const char*) sqlite3_column_text(ppstmt, 1)) == NULL)
 			break;
 		
-		json_object_object_add_ex(json_response, "value", json_object_new_string(str_ptr), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(json_response, "name", json_object_new_string(str_ptr), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		
 		if((str_ptr = (const char*) sqlite3_column_text(ppstmt, 2)) == NULL)
 			break;
@@ -214,20 +221,20 @@ unsigned int http_handler_update_config(struct MHD_Connection *conn,
 											size_t *resp_data_size,
 											void *arg) {
 	
-	const char *config_name_str;
+	const char *config_key_str;
 	
 	struct json_object *received_json;
 	
 	int result;
 	sqlite3 *db_conn = NULL;
 	sqlite3_stmt *ppstmt = NULL;
-	const char sql_update_config[] = "UPDATE configs SET (value,modification_date) = (?2,?3) WHERE name = ?1;";
+	const char sql_update_config[] = "UPDATE configs SET (value,modification_date) = (?2,?3) WHERE key = ?1;";
 	int changes;
 	
 	if(logged_user_id <= 0 || users_check_admin(logged_user_id) == 0)
 		return MHD_HTTP_UNAUTHORIZED;
 	
-	if((config_name_str = http_parameter_get_value(path_parameters, 2)) == NULL || strlen(config_name_str) < 2)
+	if((config_key_str = http_parameter_get_value(path_parameters, 2)) == NULL || strlen(config_key_str) < 1)
 		return MHD_HTTP_BAD_REQUEST;
 	
 	if(req_data == NULL)
@@ -255,7 +262,7 @@ unsigned int http_handler_update_config(struct MHD_Connection *conn,
 	}
 	
 	// SQLITE_OK é zero, então somando todos os resultados podemos saber se algum falhou
-	result = sqlite3_bind_text(ppstmt, 1, config_name_str, -1, SQLITE_STATIC);
+	result = sqlite3_bind_text(ppstmt, 1, config_key_str, -1, SQLITE_STATIC);
 	result += sqlite3_bind_text(ppstmt, 2, json_object_get_string(received_json), -1, SQLITE_STATIC);
 	result += sqlite3_bind_int64(ppstmt, 3, time(NULL));
 		

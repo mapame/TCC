@@ -11,7 +11,7 @@ int config_get_list(config_t **config_list_ptr) {
 	int result;
 	sqlite3 *db_conn = NULL;
 	sqlite3_stmt *ppstmt = NULL;
-	const char sql_get_configs[] = "SELECT name,value,modification_date FROM configs;";
+	const char sql_get_configs[] = "SELECT key,value,modification_date FROM configs;";
 	const char *str_ptr;
 	int size = 8, count = 0;
 	
@@ -61,10 +61,10 @@ int config_get_list(config_t **config_list_ptr) {
 			if((str_ptr = (const char*) sqlite3_column_text(ppstmt, 0)) == NULL)
 				break;
 			
-			(*config_list_ptr)[count].name = strdup(str_ptr);
+			(*config_list_ptr)[count].key = strdup(str_ptr);
 			
 			if((str_ptr = (const char*) sqlite3_column_text(ppstmt, 1)) == NULL) {
-				free((*config_list_ptr)[count].name);
+				free((*config_list_ptr)[count].key);
 				break;
 			}
 			
@@ -84,7 +84,7 @@ int config_get_list(config_t **config_list_ptr) {
 		LOG_ERROR("Failed to get the configuration list: %s", sqlite3_errstr(result));
 		
 		for(int pos = 0; pos < count; pos++) {
-			free((*config_list_ptr)[count].name);
+			free((*config_list_ptr)[count].key);
 			free((*config_list_ptr)[count].value);
 		}
 		
@@ -100,19 +100,19 @@ void config_free(config_t *config_ptr) {
 	if(config_ptr == NULL)
 		return;
 	
-	free(config_ptr->name);
+	free(config_ptr->key);
 	free(config_ptr->value);
 }
 
-int config_get_value(const char *name, char *value_buf, size_t buf_size) {
+int config_get_value(const char *key, char *value_buf, size_t buf_size) {
 	int result;
 	sqlite3 *db_conn = NULL;
 	sqlite3_stmt *ppstmt = NULL;
-	const char sql_get_config_value[] = "SELECT value FROM configs WHERE name=?1;";
+	const char sql_get_config_value[] = "SELECT value FROM configs WHERE key=?1;";
 	const char *str_ptr = NULL;
 	int len = -2;
 	
-	if(name == NULL)
+	if(key == NULL)
 		return 0;
 	
 	if((result = sqlite3_open(DB_FILENAME, &db_conn)) != SQLITE_OK) {
@@ -131,7 +131,7 @@ int config_get_value(const char *name, char *value_buf, size_t buf_size) {
 		return -1;
 	}
 	
-	if((result = sqlite3_bind_text(ppstmt, 1, name, -1, SQLITE_STATIC)) != SQLITE_OK) {
+	if((result = sqlite3_bind_text(ppstmt, 1, key, -1, SQLITE_STATIC)) != SQLITE_OK) {
 		LOG_ERROR("Failed to bind value to prepared statement: %s", sqlite3_errstr(result));
 		sqlite3_finalize(ppstmt);
 		sqlite3_close(db_conn);
@@ -165,11 +165,11 @@ int config_get_value(const char *name, char *value_buf, size_t buf_size) {
 	return len;
 }
 
-int config_get_value_int(const char *name, int min, int max, int default_value) {
+int config_get_value_int(const char *key, int min, int max, int default_value) {
 	char buf[50];
 	int value;
 	
-	if(config_get_value(name, buf, sizeof(buf)) <= 0)
+	if(config_get_value(key, buf, sizeof(buf)) <= 0)
 		return default_value;
 	
 	if(sscanf(buf, "%d", &value) != 1)
@@ -183,11 +183,11 @@ int config_get_value_int(const char *name, int min, int max, int default_value) 
 	return value;
 }
 
-float config_get_value_float(const char *name, float min, float max, float default_value) {
+float config_get_value_float(const char *key, float min, float max, float default_value) {
 	char buf[50];
 	float value;
 	
-	if(config_get_value(name, buf, sizeof(buf)) <= 0)
+	if(config_get_value(key, buf, sizeof(buf)) <= 0)
 		return default_value;
 	
 	if(sscanf(buf, "%f", &value) != 1)
@@ -201,11 +201,11 @@ float config_get_value_float(const char *name, float min, float max, float defau
 	return value;
 }
 
-double config_get_value_double(const char *name, double min, double max, double default_value) {
+double config_get_value_double(const char *key, double min, double max, double default_value) {
 	char buf[50];
 	double value;
 	
-	if(config_get_value(name, buf, sizeof(buf)) <= 0)
+	if(config_get_value(key, buf, sizeof(buf)) <= 0)
 		return default_value;
 	
 	if(sscanf(buf, "%lf", &value) != 1)

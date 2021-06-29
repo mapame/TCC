@@ -210,6 +210,8 @@ unsigned int http_handler_get_load_events(struct MHD_Connection *conn,
 		json_object_object_add_ex(response_item, "delta_pt", json_object_new_double(loadev_buffer[i].delta_pt), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		json_object_object_add_ex(response_item, "peak_pt", json_object_new_double(loadev_buffer[i].peak_pt), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		json_object_object_add_ex(response_item, "top_appliance_id", json_object_new_int(loadev_buffer[i].top_appliance_id), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(response_item, "prob_avg",  json_object_new_double(loadev_buffer[i].prob_avg), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(response_item, "prob_sd",  json_object_new_double(loadev_buffer[i].prob_sd), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		
 		appliance_array = json_object_new_array();
 		json_object_array_add(appliance_array, json_object_new_double(loadev_buffer[i].delta_p[0]));
@@ -228,6 +230,20 @@ unsigned int http_handler_get_load_events(struct MHD_Connection *conn,
 		json_object_array_add(appliance_array, json_object_new_double(loadev_buffer[i].delta_q[1]));
 		
 		json_object_object_add_ex(response_item, "delta_q", appliance_array, JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		
+		appliance_array = json_object_new_array();
+		json_object_array_add(appliance_array, json_object_new_int(loadev_buffer[i].appliance_ids[0]));
+		json_object_array_add(appliance_array, json_object_new_int(loadev_buffer[i].appliance_ids[1]));
+		json_object_array_add(appliance_array, json_object_new_int(loadev_buffer[i].appliance_ids[2]));
+		
+		json_object_object_add_ex(response_item, "appliance_ids", appliance_array, JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		
+		appliance_array = json_object_new_array();
+		json_object_array_add(appliance_array, json_object_new_double(loadev_buffer[i].appliance_probs[0]));
+		json_object_array_add(appliance_array, json_object_new_double(loadev_buffer[i].appliance_probs[1]));
+		json_object_array_add(appliance_array, json_object_new_double(loadev_buffer[i].appliance_probs[2]));
+		
+		json_object_object_add_ex(response_item, "appliance_probs", appliance_array, JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		
 		json_object_array_add(response_array, response_item);
 	}
