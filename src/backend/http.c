@@ -111,6 +111,17 @@ static const path_segment_t url_path_tree = {
 				{}
 			}
 		},{
+			.text = "configs",
+			.get_handler = http_handler_get_config_list,
+			.children = (const path_segment_t[]) {
+				{
+					.text = "*",
+					.get_handler = http_handler_get_config,
+					.put_handler = http_handler_update_config,
+				},
+				{}
+			}
+		},{
 			.text = "meter",
 			.children = (const path_segment_t[]) {
 				{
