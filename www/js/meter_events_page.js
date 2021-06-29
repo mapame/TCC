@@ -6,8 +6,8 @@ window.onload = function() {
 function initPage() {
 	userInfoFetch(function() {navbarPopulateItems("main-menu");});
 	
-	document.getElementById("timespan-select").onchange = updateTimespan;
-	document.getElementById("event-type-select").onchange = updateEventTable.bind(null, 1);
+	document.getElementById("timespan-select").onchange = updateEventTable;
+	document.getElementById("event-type-select").onchange = updateEventTable;
 	
 	window.smceeMeterEventTimespan = Number(document.getElementById("timespan-select").value);
 	fetchEvents(window.smceeMeterEventTimespan);
@@ -30,11 +30,21 @@ function eventTableAddItem(item) {
 	tableCellType.innerText = item.type + ((item.count > 1) ? (" (x" + item.count + ")") : "");
 }
 
-function updateEventTable(page=1) {
+function updateEventTable(page) {
 	var tableBody = document.getElementById("meter-events-tbody");
 	var eventType = document.getElementById("event-type-select").value;
+	var timespan = Number(document.getElementById("timespan-select").value);
 	var filteredEvents;
 	var pageCount;
+	
+	if(timespan !== window.smceeMeterEventTimespan) {
+		window.smceeMeterEventTimespan = timespan;
+		fetchEvents(timespan);
+		return;
+	}
+	
+	if(typeof page != "number")
+		page = 1;
 	
 	if(typeof window.smceeMeterEvents != "object")
 		return;
@@ -121,24 +131,6 @@ function updateEventPagination(pageCount, currentPage) {
 				pageIndex = pageCount - 1;
 		}
 	}
-}
-
-function updateTimespan() {
-	var newTimespan = Number(document.getElementById("timespan-select").value);
-	
-	if(typeof window.smceeMeterEvents != "object")
-		return;
-	
-	if(newTimespan > window.smceeMeterEventTimespan) {
-		fetchEvents(newTimespan);
-	} else if(window.smceeMeterEvents.length > 0) {
-		let startTimestamp = window.smceeMeterEvents[0].timestamp - newTimespan;
-		window.smceeMeterEvents = window.smceeMeterEvents.filter(event => event.timestamp >= startTimestamp);
-		updateTypeFilterSelect();
-		updateEventTable();
-	}
-	
-	window.smceeMeterEventTimespan = newTimespan;
 }
 
 function fetchEvents(timespan) {
