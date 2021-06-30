@@ -75,7 +75,7 @@ unsigned int http_handler_get_config_list(struct MHD_Connection *conn,
 		
 		json_object_object_add_ex(json_config_item, "description", json_object_new_string(str_ptr), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		
-		json_object_object_add_ex(json_config_item, "modification_date", json_object_new_int64(sqlite3_column_int64(ppstmt, 3)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(json_config_item, "modification_date", json_object_new_int64(sqlite3_column_int64(ppstmt, 4)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 	}
 	
 	sqlite3_finalize(ppstmt);
@@ -177,7 +177,7 @@ unsigned int http_handler_get_config(struct MHD_Connection *conn,
 		
 		json_object_object_add_ex(json_response, "description", json_object_new_string(str_ptr), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		
-		json_object_object_add_ex(json_response, "modification_date", json_object_new_int64(sqlite3_column_int64(ppstmt, 3)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(json_response, "modification_date", json_object_new_int64(sqlite3_column_int64(ppstmt, 4)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 	}
 	
 	sqlite3_finalize(ppstmt);
