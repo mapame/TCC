@@ -178,7 +178,7 @@ function dashboardFetchData() {
 					document.getElementById("power-a-value").innerText = lastPowerData.p1.toFixed(1);
 					document.getElementById("power-b-value").innerText = lastPowerData.p2.toFixed(1);
 					
-					document.getElementById("hourly-cost").innerText = ((lastPowerData.p1 + lastPowerData.p2) * responseObject.energy_rate / 1000).toFixed(2);
+					document.getElementById("hourly-cost").innerText = ((lastPowerData.p1 + lastPowerData.p2) * responseObject.kwh_rate / 1000).toFixed(2);
 				}
 			}
 			

@@ -20,6 +20,5 @@ typedef struct energy_rate_s {
 } energy_rate_t;
 
 int energy_add_power(power_data_t *pd);
-int energy_get_timestamp_rate(time_t timestamp, double *rate_ptr);
 
 #endif

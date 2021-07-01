@@ -6,101 +6,9 @@
 
 #include "common.h"
 #include "logger.h"
+#include "config.h"
 #include "power.h"
 #include "database.h"
-
-int energy_get_timestamp_rate(time_t timestamp, double *rate_ptr) {
-	int result;
-	sqlite3 *db_conn = NULL;
-	sqlite3_stmt *ppstmt = NULL;
-	const char sql_get_energy_rate[] = "SELECT rate,peak_rate,mid_rate,peak_start,peak_end,mid_start,mid_end FROM energy_rates WHERE start_timestamp <= ?1 ORDER BY start_timestamp DESC LIMIT 1;";
-	int found = 0;
-	int rate_is_tou = 0;
-	double rate, peak_rate, mid_rate;
-	int peak_start_dmin, peak_end_dmin, mid_start_dmin, mid_end_dmin;
-	
-	if(rate_ptr == NULL)
-		return -1;
-	
-	if((result = sqlite3_open(DB_FILENAME, &db_conn)) != SQLITE_OK) {
-		LOG_ERROR("Failed to open database connection: %s", sqlite3_errstr(result));
-		sqlite3_close(db_conn);
-		
-		return -2;
-	}
-	
-	sqlite3_busy_timeout(db_conn, 1000);
-	
-	if((result = sqlite3_prepare_v2(db_conn, sql_get_energy_rate, -1, &ppstmt, NULL)) != SQLITE_OK) {
-		LOG_ERROR("Failed to prepare SQL statement: %s", sqlite3_errstr(result));
-		sqlite3_close(db_conn);
-		
-		return -2;
-	}
-	
-	if(sqlite3_bind_int64(ppstmt, 1, timestamp) != SQLITE_OK) {
-		LOG_ERROR("Failed to bind value to prepared statement.");
-		sqlite3_finalize(ppstmt);
-		sqlite3_close(db_conn);
-		
-		return -2;
-	}
-	
-	if((result = sqlite3_step(ppstmt)) == SQLITE_ROW) {
-		found = 1;
-		
-		rate = sqlite3_column_double(ppstmt, 0);
-		
-		rate_is_tou = 1;
-		for(int icol = 2; icol <= 7; icol++)
-			if(sqlite3_column_type(ppstmt, icol) == SQLITE_NULL) {
-				rate_is_tou = 0;
-				break;
-			}
-		
-		if(rate_is_tou) {
-			peak_rate = sqlite3_column_double(ppstmt, 1);
-			mid_rate = sqlite3_column_double(ppstmt, 2);
-			peak_start_dmin = sqlite3_column_int(ppstmt, 3);
-			peak_end_dmin = sqlite3_column_int(ppstmt, 4);
-			mid_start_dmin = sqlite3_column_int(ppstmt, 5);
-			mid_end_dmin = sqlite3_column_int(ppstmt, 6);
-		}
-		
-		result = sqlite3_step(ppstmt);
-	}
-	
-	sqlite3_finalize(ppstmt);
-	sqlite3_close(db_conn);
-	
-	if(result != SQLITE_DONE) {
-		LOG_ERROR("Failed to read energy rate: %s", sqlite3_errstr(result));
-		return -2;
-	}
-	
-	if(!found)
-		return 2;
-	
-	*rate_ptr = rate;
-	
-	if(rate_is_tou) {
-		struct tm time_tm;
-		
-		localtime_r(&timestamp, &time_tm);
-		mktime(&time_tm);
-		
-		if(time_tm.tm_wday != 0 && time_tm.tm_wday != 6) {
-			int day_minute = time_tm.tm_hour * 60 + time_tm.tm_min;
-			
-			if(day_minute >= peak_start_dmin && day_minute <= peak_end_dmin)
-				*rate_ptr = peak_rate;
-			else if(day_minute >= mid_start_dmin && day_minute <= mid_end_dmin)
-				*rate_ptr = mid_rate;
-		}
-	}
-	
-	return 0;
-}
 
 int energy_add_power(power_data_t *pd) {
 	int result;
@@ -118,7 +26,6 @@ int energy_add_power(power_data_t *pd) {
 	double p_total;
 	double active_energy_total;
 	double reactive_energy_total;
-	double e_rate = 0.0;
 	double cost;
 	
 	if(pd == NULL)
@@ -136,10 +43,7 @@ int energy_add_power(power_data_t *pd) {
 	active_energy_total = p_total / (3600.0 * 1000.0);
 	reactive_energy_total = (pd->q[0] + pd->q[1]) / (3600.0 * 1000.0);
 	
-	if(energy_get_timestamp_rate(pd->timestamp, &e_rate) < 0)
-		return -1;
-	
-	cost = e_rate * active_energy_total;
+	cost = config_get_value_double("kwh_rate", 0, 10, 0) * active_energy_total;
 	
 	if((result = sqlite3_open(DB_FILENAME, &db_conn)) != SQLITE_OK) {
 		LOG_ERROR("Failed to open database connection: %s", sqlite3_errstr(result));

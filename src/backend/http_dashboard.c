@@ -8,9 +8,9 @@
 #include "common.h"
 #include "logger.h"
 #include "http.h"
+#include "config.h"
 #include "database.h"
 #include "power.h"
-#include "energy.h"
 
 
 unsigned int http_handler_get_dashboard_data(struct MHD_Connection *conn,
@@ -25,7 +25,6 @@ unsigned int http_handler_get_dashboard_data(struct MHD_Connection *conn,
 	int result;
 	time_t last_power_timestamp = 0;
 	power_data_t pdata[5];
-	double e_rate = 0;
 	
 	sqlite3 *db_conn = NULL;
 	sqlite3_stmt *ppstmt = NULL;
@@ -75,13 +74,7 @@ unsigned int http_handler_get_dashboard_data(struct MHD_Connection *conn,
 		}
 	}
 	
-	if(energy_get_timestamp_rate((last_power_timestamp ? last_power_timestamp : time(NULL)), &e_rate) < 0) {
-		json_object_put(response_object);
-		
-		return MHD_HTTP_INTERNAL_SERVER_ERROR;
-	}
-	
-	json_object_object_add_ex(response_object, "energy_rate", json_object_new_double(e_rate), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+	json_object_object_add_ex(response_object, "kwh_rate", json_object_new_double(config_get_value_double("kwh_rate", 0, 10, 0)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 	
 	if((result = sqlite3_open(DB_FILENAME, &db_conn)) != SQLITE_OK) {
 		LOG_ERROR("Failed to open database connection: %s", sqlite3_errstr(result));

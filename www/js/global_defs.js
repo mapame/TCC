@@ -14,7 +14,6 @@ window.smceeNavbarMenuItems = [
 		{name: "Configurações", href: "configs.html"},
 		{name: "Eventos do Medidor", href: "meter_events.html"},
 		{name: null},
-		{name: "Tarifas", href: "rates.html"},
 		{name: "Aparelhos", href: "appliances.html"},
 		{name: "Assinaturas", href: "signatures.html"},
 	]}
