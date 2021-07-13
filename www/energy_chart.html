@@ -1,0 +1,101 @@
+<!doctype html>
+<html>
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+	
+	<link rel="icon" href="favicon.png">
+	
+	<link href="css/materialdesignicons.min.css" media="all" rel="stylesheet" type="text/css">
+	<link rel="stylesheet" href="css/bulma.min.css">
+	<link rel="stylesheet" href="css/custom-elements.css">
+	
+	<script src="js/chart.min.js"></script>
+	
+	<script src="js/global_defs.js"></script>
+	<script src="js/auth.js"></script>
+	<script src="js/user_info.js"></script>
+	<script src="js/navbar.js"></script>
+	
+	<script src="js/energy_chart_page.js"></script>
+	
+	<title>SMCEE - Gráficos de Energia</title>
+</head>
+<body>
+	<nav class="navbar is-dark" role="navigation" aria-label="main navigation">
+		<div class="navbar-brand">
+			<a class="navbar-item" href="./">
+				<img src="img/logo.png">
+			</a>
+			<a role="button" class="navbar-burger" data-target="main-menu"></a>
+		</div>
+		<div id="main-menu" class="navbar-menu">
+		</div>
+	</nav>
+	<div class="section">
+		<div class="container is-max-desktop">
+			<div class="level mb-2">
+				<div class="level-left">
+					<div class="level-item">
+						<div class="select">
+							<select id="chart-type-select" disabled>
+								<option value="hours">Horas</option>
+								<option value="days">Dias</option>
+								<option value="months">Meses</option>
+							</select>
+						</div>
+						<label class="checkbox ml-4">
+							<input id="comparison-checkbox" type="checkbox" disabled>
+							Comparação de datas
+						</label>
+					</div>
+				</div>
+				<div class="level-right">
+					<div class="level-item">
+						<input class="input is-primary is-hidden" id="date-day-input" type="date" disabled>
+						<div class="select is-primary is-hidden">
+							<select id="date-month-select" disabled>
+							</select>
+						</div>
+						<div class="select is-primary is-hidden">
+							<select id="date-year-select" disabled>
+							</select>
+						</div>
+					</div>
+					<div class="level-item is-hidden" id="comparison-date-item">
+						<input class="input is-info" id="comparison-date-day-input" type="date">
+						<div class="select is-info">
+							<select id="comparison-date-month-select">
+							</select>
+						</div>
+						<div class="select is-info">
+							<select id="comparison-date-year-select">
+							</select>
+						</div>
+					</div>
+				</div>
+			</div>
+			
+			<div class="" style="width: 100%; height: 60vh;"><canvas id="energy-chart-canvas"></canvas></div>
+			
+			<div class="level mt-2">
+				<div class="level-left">
+					<div class="level-item">
+						<label class="checkbox mr-4">
+							<input id="cost-checkbox" type="checkbox" disabled>
+							Custo
+						</label>
+						<label class="checkbox">
+							<input id="coverage-checkbox" type="checkbox" disabled>
+							Cobertura
+						</label>
+					</div>
+				</div>
+				<div class="level-right">
+				</div>
+			</div>
+		</div>
+	</div>
+</body>
+</html>
+
