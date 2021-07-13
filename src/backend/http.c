@@ -10,9 +10,13 @@
 #include "auth.h"
 
 #include "http_auth.h"
+#include "http_users.h"
 #include "http_config.h"
 #include "http_dashboard.h"
+#include "http_meter.h"
 #include "http_power.h"
+#include "http_energy.h"
+#include "http_appliances.h"
 
 #define CONNECTION_LIMIT 200
 #define CONNECTION_TIMEOUT 5
@@ -140,6 +144,28 @@ static const path_segment_t url_path_tree = {
 				{
 					.text = "events",
 					.get_handler = http_handler_get_load_events,
+				},
+				{}
+			}
+		},{
+			.text = "energy",
+			.get_handler = http_handler_get_energy_overview,
+			.children = (const path_segment_t[]) {
+				{
+					.text = "minutes",
+					.get_handler = http_handler_get_energy_minutes,
+				},
+				{
+					.text = "hours",
+					.get_handler = http_handler_get_energy_hours,
+				},
+				{
+					.text = "days",
+					.get_handler = http_handler_get_energy_days,
+				},
+				{
+					.text = "months",
+					.get_handler = http_handler_get_energy_months,
 				},
 				{}
 			}
