@@ -4,6 +4,7 @@ window.smceeNavbarMenuItems = [
 	{name: "Gráficos", dropdown: [
 		{name: "Potência e Tensão", href: "power_chart.html"},
 		{name: "Energia", href: "energy_chart.html"},
+		{name: "Energia (minutos)", href: "energy_chart_minutes.html"},
 		{name: "Assinaturas", href: "signature_chart.html"},
 	]},
 	{name: "Administração", adminOnly: true, dropdown: [

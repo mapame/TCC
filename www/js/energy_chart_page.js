@@ -178,12 +178,8 @@ function changeChartType() {
 		dayComparisonInput.classList.add("is-hidden");
 	}
 	
-	/*
-	if(selectedType == "minutes") {
-		document.getElementById('comparison-checkbox').checked = false;
-		document.getElementById("comparison-date-item").classList.add("is-hidden");
-	}
-	*/
+	window.smceeEnergyData.energyData.date = "";
+	window.smceeEnergyData.energyComparisonData.date = "";
 	
 	updateChart();
 }

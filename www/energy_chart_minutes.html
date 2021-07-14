@@ -1,0 +1,73 @@
+<!doctype html>
+<html>
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+	
+	<link rel="icon" href="favicon.png">
+	
+	<link href="css/materialdesignicons.min.css" media="all" rel="stylesheet" type="text/css">
+	<link rel="stylesheet" href="css/bulma.min.css">
+	<link rel="stylesheet" href="css/custom-elements.css">
+	<link rel="stylesheet" href="css/dygraph.css">
+	
+	<script src="js/dygraph.min.js"></script>
+	
+	<script src="js/global_defs.js"></script>
+	<script src="js/auth.js"></script>
+	<script src="js/user_info.js"></script>
+	<script src="js/navbar.js"></script>
+	
+	<script src="js/energy_chart_minute_page.js"></script>
+	
+	<title>SMCEE - Gráfico de Energia em Minutos</title>
+</head>
+<body>
+	<nav class="navbar is-dark" role="navigation" aria-label="main navigation">
+		<div class="navbar-brand">
+			<a class="navbar-item" href="./">
+				<img src="img/logo.png">
+			</a>
+			<a role="button" class="navbar-burger" data-target="main-menu"></a>
+		</div>
+		<div id="main-menu" class="navbar-menu">
+		</div>
+	</nav>
+	<div class="section">
+		<div class="container is-max-desktop">
+			<div class="level mb-2">
+				<div class="level-left">
+					<div class="level-item">
+						<label class="checkbox">
+							<input id="disaggregation-checkbox" type="checkbox" disabled>
+							Energia desagregada
+						</label>
+					</div>
+				</div>
+				<div class="level-right">
+					<div class="level-item">
+						<input class="input" id="date-input" type="date">
+					</div>
+				</div>
+			</div>
+			
+			<div style="width: 100%; font-size: small; text-align: right;" id="chart-labels"></div>
+			<div id="minute-energy-chart" style="width: 100%;"></div>
+			
+			<div class="level mt-2">
+				<div class="level-left">
+					<div class="level-item">
+						<label class="checkbox">
+							<input id="reactive-checkbox" type="checkbox">
+							Energia Reativa
+						</label>
+					</div>
+				</div>
+				<div class="level-right">
+				</div>
+			</div>
+		</div>
+	</div>
+</body>
+</html>
+
