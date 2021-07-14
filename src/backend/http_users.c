@@ -253,7 +253,7 @@ unsigned int http_handler_update_user(struct MHD_Connection *conn,
 	const char *user_id_str;
 	
 	struct json_object *received_json;
-	struct json_object *json_user_is_active, *json_user_is_admin, *json_user_password;
+	struct json_object *json_user_name, *json_user_is_active, *json_user_is_admin, *json_user_password;
 	int result;
 	user_t user;
 	
@@ -286,11 +286,13 @@ unsigned int http_handler_update_user(struct MHD_Connection *conn,
 	if(received_json == NULL)
 		return MHD_HTTP_BAD_REQUEST;
 	
+	json_object_object_get_ex(received_json, "name", &json_user_name);
 	json_object_object_get_ex(received_json, "password", &json_user_password);
 	json_object_object_get_ex(received_json, "is_active", &json_user_is_active);
 	json_object_object_get_ex(received_json, "is_admin", &json_user_is_admin);
 	
-	if((json_user_password && json_object_get_type(json_user_password) != json_type_string)
+	if((json_user_name && json_object_get_type(json_user_name) != json_type_string)
+		|| (json_user_password && json_object_get_type(json_user_password) != json_type_string)
 		|| (json_user_is_active && json_object_get_type(json_user_is_active) != json_type_boolean)
 		|| (json_user_is_admin && json_object_get_type(json_user_is_admin) != json_type_boolean)) {
 		
@@ -319,6 +321,17 @@ unsigned int http_handler_update_user(struct MHD_Connection *conn,
 	}
 	
 	if(users_check_admin(logged_user_id) == 1) {
+		if(json_user_name) {
+			free(user.name);
+			user.name = strdup(json_object_get_string(json_user_name));
+			
+			if(strlen(user.name) < 3 || strlen(user.name) > 16) {
+				json_object_put(received_json);
+				
+				return MHD_HTTP_BAD_REQUEST;
+			}
+		}
+		
 		if(json_user_is_active)
 			user.is_active = json_object_get_boolean(json_user_is_active);
 		
