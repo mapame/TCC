@@ -93,8 +93,7 @@ function navbarPopulateItems(navbarContainerId) {
 	if(typeof window.loggedUserInfo === "object" && window.loggedUserInfo !== null) {
 		let usernameNavbarItem = document.createElement("div");
 		let usernameContainer = document.createElement("div");
-		let usernameTag = document.createElement("span");
-		let usernameTagText = document.createElement("span");
+		let usernameTag = document.createElement("a");
 		let logoutButton = document.createElement("a");
 		
 		navbarEnd.appendChild(usernameNavbarItem);
@@ -110,23 +109,10 @@ function navbarPopulateItems(navbarContainerId) {
 		usernameTag.className = "tag is-rounded is-light has-text-weight-bold";
 		logoutButton.className = "tag is-delete is-rounded is-light is-danger";
 		
-		//usernameTag.addEventListener("click", userChangePassword);
+		usernameTag.href = "users.html";
+		
 		logoutButton.addEventListener("click", authLogout);
 		
-		usernameTagText.innerText = window.loggedUserInfo.name;
-		
-		if(window.loggedUserInfo.is_admin === true) {
-			let usernameAdminIconContainer = document.createElement("span");
-			let usernameAdminIcon = document.createElement("i");
-			
-			usernameAdminIconContainer.className = "icon is-small";
-			usernameAdminIcon.className = "mdi mdi-18px mdi-crown";
-			
-			usernameAdminIconContainer.appendChild(usernameAdminIcon);
-			usernameTag.appendChild(usernameAdminIconContainer);
-			
-		}
-		
-		usernameTag.appendChild(usernameTagText);
+		usernameTag.innerText = window.loggedUserInfo.name + (window.loggedUserInfo.is_admin ? " (administrador)" : "");
 	}
 }
