@@ -1,21 +1,28 @@
 window.onload = function() {
-	authCheckAccessKey(initPage, redirectToLogin);
+	authCheckAccessKey(function() { userInfoFetch(initPage); }, redirectToLogin);
 	addEventsNavbarBurgers();
 }
 
 function initPage() {
-	userInfoFetch(function() {navbarPopulateItems("main-menu");});
+	navbarPopulateItems("main-menu");
 	
 	document.getElementById("button-open-add-user").onclick = openAddUserModal;
 	document.getElementById("inactive-filter-checkbox").onchange = updateUserTable;
 	
-	document.getElementById("button-discard-user").onclick = modalCloseAll;
-	
-	fetchUserList();
+	if(window.loggedUserInfo.is_admin) {
+		fetchUserList();
+	} else {
+		document.getElementsByClassName("section")[0].classList.add("is-hidden");
+		openChangePasswordModal();
+	}
 }
 
 function openAddUserModal() {
 	document.getElementById("modal-title-user").innerText = "Adicionar novo usuário";
+	
+	document.getElementById("input-user-name").disabled = false;
+	document.getElementById("input-user-is-active").disabled = false;
+	document.getElementById("input-user-is-admin").disabled = false;
 	
 	document.getElementById("input-user-name").value = "";
 	document.getElementById("input-user-is-active").checked = false;
@@ -27,6 +34,7 @@ function openAddUserModal() {
 	document.getElementById("input-user-password-confirmation").placeholder = "";
 	
 	document.getElementById("button-submit-user").onclick = submitNewUser;
+	document.getElementById("button-discard-user").onclick = modalCloseAll;
 	
 	modalOpen("modal-user");
 }
@@ -34,7 +42,11 @@ function openAddUserModal() {
 function openEditUserModal(userId) {
 	var user = window.smceeUserList.get(userId);
 	
-	document.getElementById("modal-title-user").innerText = "Editar usuário " + userId;
+	document.getElementById("modal-title-user").innerText = "Editar usuário: " + user.name;
+	
+	document.getElementById("input-user-name").disabled = false;
+	document.getElementById("input-user-is-active").disabled = false;
+	document.getElementById("input-user-is-admin").disabled = false;
 	
 	document.getElementById("input-user-name").value = user.name;
 	document.getElementById("input-user-is-active").checked = user.is_active;
@@ -46,6 +58,29 @@ function openEditUserModal(userId) {
 	document.getElementById("input-user-password-confirmation").placeholder = "Deixe em branco para manter a senha atual.";
 	
 	document.getElementById("button-submit-user").onclick = submitUpdatedUser.bind(null, userId);
+	document.getElementById("button-discard-user").onclick = modalCloseAll;
+	
+	modalOpen("modal-user");
+}
+
+function openChangePasswordModal() {
+	document.getElementById("modal-title-user").innerText = "Alterar senha";
+	
+	document.getElementById("input-user-name").disabled = true;
+	document.getElementById("input-user-is-active").disabled = true;
+	document.getElementById("input-user-is-admin").disabled = true;
+	
+	document.getElementById("input-user-name").value = window.loggedUserInfo.name;
+	document.getElementById("input-user-is-active").checked = window.loggedUserInfo.is_active;
+	document.getElementById("input-user-is-admin").checked = window.loggedUserInfo.is_admin;
+	
+	document.getElementById("input-user-password").value = "";
+	document.getElementById("input-user-password").placeholder = "";
+	document.getElementById("input-user-password-confirmation").value = "";
+	document.getElementById("input-user-password-confirmation").placeholder = "";
+	
+	document.getElementById("button-submit-user").onclick = submitNewPassword;
+	document.getElementById("button-discard-user").onclick = function() { window.location.replace("/"); };
 	
 	modalOpen("modal-user");
 }
@@ -211,7 +246,7 @@ function submitNewUser() {
 				modalCloseAll();
 				
 			} else if(responseObject.result === "failed") {
-				alert("Erro ao salvar novo aparelho.");
+				alert("Falha ao salvar novo usuário.");
 			}
 			
 		} else if(this.status === 401) {
@@ -267,6 +302,8 @@ function submitUpdatedUser(userId) {
 				updateUserTable();
 				
 				modalCloseAll();
+			} else {
+				alert("Falha ao salvar modificações de usuário.");
 			}
 			
 		} else if(this.status === 401) {
@@ -285,5 +322,43 @@ function submitUpdatedUser(userId) {
 	xhrUpdateUser.setRequestHeader("Authorization", "Bearer " + localStorage.getItem("access_key"));
 	
 	xhrUpdateUser.send(JSON.stringify(updatedUser));
+	
+}
+
+function submitNewPassword() {
+	var xhrChangePassword;
+	
+	if(!validateUserForm(false))
+		return;
+	
+	document.getElementById("button-submit-user").classList.add("is-loading");
+	
+	xhrChangePassword = new XMLHttpRequest()
+	
+	xhrChangePassword.onload = function() {
+		if(this.status === 200) {
+			var responseObject = JSON.parse(this.responseText);
+			
+			if(responseObject.result === "success")
+				window.location.replace("/");
+			else
+				alert("Falha ao alterar senha.");
+			
+		} else if(this.status === 401) {
+			redirectToLogin();
+		} else {
+			console.error("Failed to modify password. Status: " + this.status);
+		}
+		
+		document.getElementById("button-submit-user").classList.remove("is-loading");
+	};
+	
+	xhrChangePassword.open("PUT", window.smceeApiUrlBase + "users/self", true);
+	
+	xhrChangePassword.timeout = 2000;
+	
+	xhrChangePassword.setRequestHeader("Authorization", "Bearer " + localStorage.getItem("access_key"));
+	
+	xhrChangePassword.send(JSON.stringify({"password": document.getElementById("input-user-password").value}));
 	
 }
