@@ -22,15 +22,6 @@
 #define SVM_PARAM_QTY_OFF 4
 #define SVM_CROSSV_FOLD_NUM 5
 
-typedef struct load_signature_s {
-	int appliance_id;
-	double delta_pt;
-	double peak_pt;
-	double delta_p[2];
-	double delta_q[2];
-	double delta_s[2];
-	double features[SVM_PARAM_QTY_ON];
-} load_signature_t;
 
 static pthread_mutex_t load_event_mutex = PTHREAD_MUTEX_INITIALIZER;
 
