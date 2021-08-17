@@ -32,6 +32,7 @@ static size_t generate_pd_filename(time_t time_epoch, char *buffer, size_t len) 
 
 static int import_power_data_file(const char *filename, time_t timestamp_limit) {
 	FILE *pd_file = NULL;
+	char line_buffer[128];
 	power_data_t pd_aux;
 	int counter = 0;
 	
@@ -43,7 +44,10 @@ static int import_power_data_file(const char *filename, time_t timestamp_limit) 
 	if(pthread_mutex_lock(&power_data_mutex))
 		return -2;
 	
-	while(fscanf(pd_file, "%li,%lf,%lf,%lf,%lf,%lf,%lf\n", &pd_aux.timestamp, &pd_aux.v[0], &pd_aux.v[1], &pd_aux.i[0], &pd_aux.i[1], &pd_aux.p[0], &pd_aux.p[1]) == 7) {
+	while(fgets(line_buffer, sizeof(line_buffer), pd_file)) {
+		if(sscanf(line_buffer, "%li,%lf,%lf,%lf,%lf,%lf,%lf\n", &pd_aux.timestamp, &pd_aux.v[0], &pd_aux.v[1], &pd_aux.i[0], &pd_aux.i[1], &pd_aux.p[0], &pd_aux.p[1]) != 7)
+			continue;
+		
 		if(pd_aux.timestamp < timestamp_limit)
 			continue;
 		
