@@ -65,7 +65,7 @@ int energy_add_power(power_data_t *pd) {
 	 * Minuto
 	 */
 	if((result = sqlite3_prepare_v2(db_conn, sql_store_minute, -1, &ppstmt, NULL)) != SQLITE_OK) {
-		LOG_ERROR("Failed to prepare the SQL statement for minute power data storage: %s", sqlite3_errstr(result));
+		LOG_ERROR("Failed to prepare the SQL statement for minute energy storage: %s", sqlite3_errstr(result));
 		sqlite3_close(db_conn);
 		
 		return -1;
@@ -92,7 +92,7 @@ int energy_add_power(power_data_t *pd) {
 	sqlite3_finalize(ppstmt);
 	
 	if(result != SQLITE_DONE) {
-		LOG_ERROR("Failed to store power data as minute: %s", sqlite3_errstr(result));
+		LOG_ERROR("Failed to store minute energy data: %s", sqlite3_errstr(result));
 		sqlite3_close(db_conn);
 		
 		return -1;
@@ -102,7 +102,7 @@ int energy_add_power(power_data_t *pd) {
 	 * Hora
 	 */
 	if((result = sqlite3_prepare_v2(db_conn, sql_store_hour, -1, &ppstmt, NULL)) != SQLITE_OK) {
-		LOG_ERROR("Failed to prepare the SQL statement for hour power data storage: %s", sqlite3_errstr(result));
+		LOG_ERROR("Failed to prepare the SQL statement for hour energy storage: %s", sqlite3_errstr(result));
 		sqlite3_close(db_conn);
 		
 		return -1;
@@ -131,7 +131,7 @@ int energy_add_power(power_data_t *pd) {
 	sqlite3_finalize(ppstmt);
 	
 	if(result != SQLITE_DONE) {
-		LOG_ERROR("Failed to store power data as hour: %s", sqlite3_errstr(result));
+		LOG_ERROR("Failed to store hour energy data: %s", sqlite3_errstr(result));
 		sqlite3_close(db_conn);
 		
 		return -1;
@@ -141,7 +141,7 @@ int energy_add_power(power_data_t *pd) {
 	 * Dia
 	 */
 	if((result = sqlite3_prepare_v2(db_conn, sql_store_day, -1, &ppstmt, NULL)) != SQLITE_OK) {
-		LOG_ERROR("Failed to prepare the SQL statement for day power data storage: %s", sqlite3_errstr(result));
+		LOG_ERROR("Failed to prepare the SQL statement for day energy storage: %s", sqlite3_errstr(result));
 		sqlite3_close(db_conn);
 		
 		return -1;
@@ -169,14 +169,14 @@ int energy_add_power(power_data_t *pd) {
 	sqlite3_finalize(ppstmt);
 	
 	if(result != SQLITE_DONE) {
-		LOG_ERROR("Failed to store power data as day: %s", sqlite3_errstr(result));
+		LOG_ERROR("Failed to store day energy: %s", sqlite3_errstr(result));
 		sqlite3_close(db_conn);
 		
 		return -1;
 	}
 	
 	if(sqlite3_exec(db_conn, "COMMIT", NULL, NULL, NULL) != SQLITE_OK) {
-		LOG_ERROR("Failed to commit power data to database: %s", sqlite3_errstr(result));
+		LOG_ERROR("Failed to commit energy data to database: %s", sqlite3_errstr(result));
 		sqlite3_close(db_conn);
 		
 		return -2;
