@@ -186,3 +186,221 @@ int energy_add_power(power_data_t *pd) {
 	
 	return 0;
 }
+
+static int store_disaggregated_minute_energy(sqlite3 *db_conn, int appliance_id, double energy_rate, time_t start_timestamp, time_t end_timestamp, double start_dp, double end_dp) {
+	int result;
+	const char sql_store_minute[] = "INSERT INTO disaggregated_energy_minutes(timestamp,appliance_id,active,cost,second_count) VALUES(?1,?2,?3,?4,?5)"
+									" ON CONFLICT(timestamp,appliance_id) DO UPDATE SET second_count = second_count + excluded.second_count, active = active + excluded.active, cost = cost + excluded.cost;";
+	sqlite3_stmt *ppstmt = NULL;
+	int minute_count = 0;
+	
+	double dp = MIN(start_dp, end_dp);
+	
+	time_t step_start_timestamp, step_end_timestamp;
+	double step_energy, step_cost;
+	
+	if((result = sqlite3_prepare_v2(db_conn, sql_store_minute, -1, &ppstmt, NULL)) != SQLITE_OK) {
+		LOG_ERROR("Failed to prepare the SQL statement for minute disaggregated energy storage: %s", sqlite3_errstr(result));
+		sqlite3_close(db_conn);
+		
+		return -1;
+	}
+	
+	if(sqlite3_bind_int(ppstmt, 2, appliance_id) != SQLITE_OK) {
+		LOG_ERROR("Failed to bind appliance_id to minute disaggregated energy prepared statement.");
+		sqlite3_finalize(ppstmt);
+		sqlite3_close(db_conn);
+		
+		return -1;
+	}
+	
+	step_start_timestamp = start_timestamp;
+	step_end_timestamp = start_timestamp - (start_timestamp % 60) + 59;
+	
+	if(step_end_timestamp > end_timestamp)
+		step_end_timestamp = end_timestamp;
+	
+	while(step_start_timestamp < end_timestamp) {
+		step_energy = (step_end_timestamp - step_start_timestamp) * dp / (3600.0 * 1000.0);
+		step_cost = step_energy * energy_rate;
+		
+		// SQLITE_OK é zero, então somando todos os resultados podemos saber se algum falhou
+		result = sqlite3_bind_int64(ppstmt, 1, (step_start_timestamp - step_start_timestamp % 60));
+		result += sqlite3_bind_double(ppstmt, 3, step_energy);
+		result += sqlite3_bind_double(ppstmt, 4, step_cost);
+		result += sqlite3_bind_int(ppstmt, 5, (step_end_timestamp - step_start_timestamp));
+		
+		if(result) {
+			LOG_ERROR("Failed to bind value to prepared statement.");
+			sqlite3_finalize(ppstmt);
+			sqlite3_close(db_conn);
+			
+			return -1;
+		}
+		
+		if((result = sqlite3_step(ppstmt)) != SQLITE_DONE) {
+			LOG_ERROR("Failed to store minute disaggregated energy data: %s", sqlite3_errstr(result));
+			sqlite3_finalize(ppstmt);
+			sqlite3_close(db_conn);
+			
+			return -1;
+		}
+		
+		sqlite3_reset(ppstmt);
+		
+		step_start_timestamp += 60 - step_start_timestamp % 60;
+		step_end_timestamp += 60;
+		
+		if(step_end_timestamp > end_timestamp)
+			step_end_timestamp = end_timestamp;
+		
+		minute_count++;
+	}
+	
+	sqlite3_finalize(ppstmt);
+	
+	return minute_count;
+}
+
+static int store_disaggregated_hour_energy(sqlite3 *db_conn, int appliance_id, double energy_rate, time_t start_timestamp, time_t end_timestamp, double start_dp, double end_dp) {
+	int result;
+	const char sql_store_hour[] = "INSERT INTO disaggregated_energy_hours(year,month,day,hour,appliance_id,active,cost,second_count) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)"
+									" ON CONFLICT(year,month,day,hour,appliance_id) DO UPDATE SET second_count = second_count + excluded.second_count, active = active + excluded.active, cost = cost + excluded.cost;";
+	sqlite3_stmt *ppstmt = NULL;
+	int hour_count = 0;
+	
+	double dp = MIN(start_dp, end_dp);
+	
+	struct tm date;
+	time_t step_start_timestamp, step_end_timestamp;
+	double step_energy, step_cost;
+	
+	if((result = sqlite3_prepare_v2(db_conn, sql_store_hour, -1, &ppstmt, NULL)) != SQLITE_OK) {
+		LOG_ERROR("Failed to prepare the SQL statement for hour disaggregated energy storage: %s", sqlite3_errstr(result));
+		sqlite3_close(db_conn);
+		
+		return -1;
+	}
+	
+	if(sqlite3_bind_int(ppstmt, 5, appliance_id) != SQLITE_OK) {
+		LOG_ERROR("Failed to bind appliance_id to hour disaggregated energy prepared statement.");
+		sqlite3_finalize(ppstmt);
+		sqlite3_close(db_conn);
+		
+		return -1;
+	}
+	
+	step_start_timestamp = start_timestamp;
+	step_end_timestamp = start_timestamp - (start_timestamp % 3600) + 3599; // Não funciona com fusos horários fracionados
+	
+	if(step_end_timestamp > end_timestamp)
+		step_end_timestamp = end_timestamp;
+	
+	while(step_start_timestamp < end_timestamp) {
+		step_energy = (step_end_timestamp - step_start_timestamp) * dp / (3600.0 * 1000.0);
+		step_cost = step_energy * energy_rate;
+		
+		localtime_r(&step_start_timestamp, &date);
+		
+		// SQLITE_OK é zero, então somando todos os resultados podemos saber se algum falhou
+		result = sqlite3_bind_int(ppstmt, 1, date.tm_year + 1900);
+		result += sqlite3_bind_int(ppstmt, 2, date.tm_mon + 1);
+		result += sqlite3_bind_int(ppstmt, 3, date.tm_mday);
+		result += sqlite3_bind_int(ppstmt, 4, date.tm_hour);
+		result += sqlite3_bind_double(ppstmt, 6, step_energy);
+		result += sqlite3_bind_double(ppstmt, 7, step_cost);
+		result += sqlite3_bind_int(ppstmt, 8, (step_end_timestamp - step_start_timestamp));
+		
+		if(result) {
+			LOG_ERROR("Failed to bind value to prepared statement.");
+			sqlite3_finalize(ppstmt);
+			sqlite3_close(db_conn);
+			
+			return -1;
+		}
+		
+		if((result = sqlite3_step(ppstmt)) != SQLITE_DONE) {
+			LOG_ERROR("Failed to store hour disaggregated energy data: %s", sqlite3_errstr(result));
+			sqlite3_finalize(ppstmt);
+			sqlite3_close(db_conn);
+			
+			return -1;
+		}
+		
+		sqlite3_reset(ppstmt);
+		
+		step_start_timestamp += 3600 - step_start_timestamp % 3600;
+		step_end_timestamp += 3600;
+		
+		if(step_end_timestamp > end_timestamp)
+			step_end_timestamp = end_timestamp;
+		
+		hour_count++;
+	}
+	
+	sqlite3_finalize(ppstmt);
+	
+	return hour_count;
+}
+
+int energy_add_power_disaggregated(int appliance_id, time_t start_timestamp, time_t end_timestamp, double start_dp, double end_dp) {
+	int result;
+	sqlite3 *db_conn = NULL;
+	
+	double energy_rate;
+	
+	if(start_timestamp > end_timestamp)
+		return -3;
+	
+	energy_rate = config_get_value_double("kwh_rate", 0, 10, 0);
+	
+	if((result = sqlite3_open(DB_FILENAME, &db_conn)) != SQLITE_OK) {
+		LOG_ERROR("Failed to open database connection: %s", sqlite3_errstr(result));
+		sqlite3_close(db_conn);
+		
+		return -1;
+	}
+	
+	sqlite3_busy_timeout(db_conn, 1000);
+	
+	if(sqlite3_exec(db_conn, "BEGIN TRANSACTION", NULL, NULL, NULL) != SQLITE_OK) {
+		LOG_ERROR("Failed to begin SQL transaction: %s", sqlite3_errstr(result));
+		sqlite3_close(db_conn);
+		
+		return -1;
+	}
+	
+	result = store_disaggregated_minute_energy(db_conn, appliance_id, energy_rate, start_timestamp, end_timestamp, start_dp, end_dp);
+	
+	if(result <= 0) {
+		LOG_ERROR("Failed to store minute disaggregated energy.");
+		sqlite3_close(db_conn);
+		
+		return -2;
+	} else {
+		LOG_DEBUG("Storing %d minutes of diseggregated energy to database.", result);
+	}
+	
+	store_disaggregated_hour_energy(db_conn, appliance_id, energy_rate, start_timestamp, end_timestamp, start_dp, end_dp);
+	
+	if(result <= 0) {
+		LOG_ERROR("Failed to store hour disaggregated energy.");
+		sqlite3_close(db_conn);
+		
+		return -2;
+	} else {
+		LOG_DEBUG("Storing %d hours of diseggregated energy to database.", result);
+	}
+	
+	
+	if(sqlite3_exec(db_conn, "COMMIT", NULL, NULL, NULL) != SQLITE_OK) {
+		LOG_ERROR("Failed to commit disaggregated energy data to database: %s", sqlite3_errstr(result));
+		sqlite3_close(db_conn);
+		
+		return -2;
+	}
+	
+	sqlite3_close(db_conn);
+	
+	return 0;
+}
