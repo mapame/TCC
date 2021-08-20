@@ -492,3 +492,231 @@ unsigned int http_handler_get_energy_months(struct MHD_Connection *conn,
 	
 	return MHD_HTTP_OK;
 }
+
+
+unsigned int http_handler_get_disaggregated_energy_minutes(struct MHD_Connection *conn,
+															int logged_user_id,
+															path_parameter_t *path_parameters,
+															char *req_data,
+															size_t req_data_size,
+															char **resp_content_type,
+															char **resp_data,
+															size_t *resp_data_size,
+															void *arg) {
+	
+	const char *start_timestamp_str = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "start");
+	const char *end_timestamp_str = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "end");
+	time_t start_timestamp, end_timestamp;
+	
+	int result;
+	sqlite3 *db_conn = NULL;
+	sqlite3_stmt *ppstmt = NULL;
+	const char sql_get_dis_energy_min[] = "SELECT timestamp, 0 AS appliance_id, energy_minutes.active, energy_months.min_p FROM energy_minutes LEFT JOIN energy_months ON year = strftime('%Y', timestamp, 'unixepoch', 'localtime') AND month = strftime('%m', timestamp, 'unixepoch', 'localtime') WHERE timestamp >= ?1 AND timestamp <= ?2 UNION SELECT timestamp, appliance_id, active, 0 AS min_p FROM disaggregated_energy_minutes WHERE timestamp >= ?1 AND timestamp <= ?2 ORDER BY timestamp;";
+	
+	time_t timestamp = 0;
+	int appliance_id;
+	json_object *response_array = NULL;
+	json_object *response_item = NULL;
+	json_object *appliance_energy_array = NULL;
+	
+	if(logged_user_id <= 0)
+		return MHD_HTTP_UNAUTHORIZED;
+	
+	if(start_timestamp_str == NULL || sscanf(start_timestamp_str, "%ld", &start_timestamp) != 1)
+		return MHD_HTTP_BAD_REQUEST;
+	
+	if(end_timestamp_str == NULL || sscanf(end_timestamp_str, "%ld", &end_timestamp) != 1)
+		end_timestamp = start_timestamp + 24 * 3600;
+	
+	if(end_timestamp - start_timestamp > 24 * 3600)
+		return MHD_HTTP_BAD_REQUEST;
+	
+	if((result = sqlite3_open(DB_FILENAME, &db_conn)) != SQLITE_OK) {
+		LOG_ERROR("Failed to open database connection: %s", sqlite3_errstr(result));
+		sqlite3_close(db_conn);
+		
+		return MHD_HTTP_INTERNAL_SERVER_ERROR;
+	}
+	
+	sqlite3_busy_timeout(db_conn, 1000);
+	
+	if((result = sqlite3_prepare_v2(db_conn, sql_get_dis_energy_min, -1, &ppstmt, NULL)) != SQLITE_OK) {
+		LOG_ERROR("Failed to prepare SQL statement: %s", sqlite3_errstr(result));
+		sqlite3_close(db_conn);
+		
+		return MHD_HTTP_INTERNAL_SERVER_ERROR;
+	}
+	
+	if(sqlite3_bind_int64(ppstmt, 1, start_timestamp) != SQLITE_OK || sqlite3_bind_int64(ppstmt, 2, end_timestamp) != SQLITE_OK) {
+		LOG_ERROR("Failed to bind value to prepared statement.");
+		sqlite3_finalize(ppstmt);
+		sqlite3_close(db_conn);
+		
+		return MHD_HTTP_INTERNAL_SERVER_ERROR;
+	}
+	
+	response_array = json_object_new_array();
+	
+	while((result = sqlite3_step(ppstmt)) == SQLITE_ROW) {
+		if(sqlite3_column_int64(ppstmt, 0) != timestamp) {
+			timestamp = sqlite3_column_int64(ppstmt, 0);
+			
+			response_item = json_object_new_object();
+			appliance_energy_array = json_object_new_array();
+			
+			json_object_object_add_ex(response_item, "timestamp", json_object_new_int64(timestamp), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+			json_object_object_add_ex(response_item, "appliance_energy", appliance_energy_array, JSON_C_OBJECT_ADD_KEY_IS_NEW);
+			
+			json_object_array_add(response_array, response_item);
+		}
+		
+		appliance_id = sqlite3_column_int(ppstmt, 1);
+		
+		if(appliance_id == 0) {
+			json_object_object_add_ex(response_item, "total_energy", json_object_new_double(sqlite3_column_double(ppstmt, 2)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+			json_object_object_add_ex(response_item, "standby_energy", json_object_new_double(sqlite3_column_double(ppstmt, 3) / (60 * 1000)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		} else {
+			json_object_array_put_idx(appliance_energy_array, appliance_id - 1, json_object_new_double(sqlite3_column_double(ppstmt, 2)));
+		}
+	}
+	
+	sqlite3_finalize(ppstmt);
+	sqlite3_close(db_conn);
+	
+	if(result != SQLITE_DONE) {
+		LOG_ERROR("Failed to fetch disaggregated minute energy from database: %s", sqlite3_errstr(result));
+		json_object_put(response_array);
+		return MHD_HTTP_INTERNAL_SERVER_ERROR;
+	}
+	
+	*resp_data = strdup(json_object_get_string(response_array));
+	
+	json_object_put(response_array);
+	
+	if(*resp_data == NULL)
+		return MHD_HTTP_INTERNAL_SERVER_ERROR;
+	
+	*resp_data_size = strlen(*resp_data);
+	
+	*resp_content_type = strdup(JSON_CONTENT_TYPE);
+	
+	return MHD_HTTP_OK;
+}
+
+unsigned int http_handler_get_disaggregated_energy_hours(struct MHD_Connection *conn,
+															int logged_user_id,
+															path_parameter_t *path_parameters,
+															char *req_data,
+															size_t req_data_size,
+															char **resp_content_type,
+															char **resp_data,
+															size_t *resp_data_size,
+															void *arg) {
+	
+	const char *date_year_srt = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "year");
+	const char *date_month_srt = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "month");
+	const char *date_day_srt = MHD_lookup_connection_value(conn, MHD_GET_ARGUMENT_KIND, "day");
+	int date_year, date_month, date_day;
+	
+	int result;
+	sqlite3 *db_conn = NULL;
+	sqlite3_stmt *ppstmt = NULL;
+	const char sql_get_dis_energy_min[] = "SELECT hour, 0 AS appliance_id, energy_hours.active, energy_hours.cost, energy_months.min_p FROM energy_hours LEFT JOIN energy_months ON energy_hours.year = energy_months.year AND energy_hours.month = energy_months.month WHERE energy_hours.year = ?1 AND energy_hours.month = ?2 AND energy_hours.day = ?3 UNION SELECT hour, appliance_id, active, cost, 0 AS min_p FROM disaggregated_energy_hours WHERE disaggregated_energy_hours.year = ?1 AND disaggregated_energy_hours.month = ?2 AND disaggregated_energy_hours.day = ?3;";
+	
+	int hour = -1;
+	int appliance_id;
+	json_object *response_array = NULL;
+	json_object *response_item = NULL;
+	json_object *appliance_energy_array = NULL;
+	json_object *appliance_cost_array = NULL;
+	
+	if(logged_user_id <= 0)
+		return MHD_HTTP_UNAUTHORIZED;
+	
+	if(date_year_srt == NULL || sscanf(date_year_srt, "%d", &date_year) != 1)
+		return MHD_HTTP_BAD_REQUEST;
+		
+	if(date_month_srt == NULL || sscanf(date_month_srt, "%d", &date_month) != 1)
+		return MHD_HTTP_BAD_REQUEST;
+		
+	if(date_day_srt == NULL || sscanf(date_day_srt, "%d", &date_day) != 1)
+		return MHD_HTTP_BAD_REQUEST;
+	
+	if(date_year < 2021 || date_month < 1 || date_month > 12 || date_day < 1 || date_day > 31)
+		return MHD_HTTP_BAD_REQUEST;
+	
+	if((result = sqlite3_open(DB_FILENAME, &db_conn)) != SQLITE_OK) {
+		LOG_ERROR("Failed to open database connection: %s", sqlite3_errstr(result));
+		sqlite3_close(db_conn);
+		
+		return MHD_HTTP_INTERNAL_SERVER_ERROR;
+	}
+	
+	sqlite3_busy_timeout(db_conn, 1000);
+	
+	if((result = sqlite3_prepare_v2(db_conn, sql_get_dis_energy_min, -1, &ppstmt, NULL)) != SQLITE_OK) {
+		LOG_ERROR("Failed to prepare SQL statement: %s", sqlite3_errstr(result));
+		sqlite3_close(db_conn);
+		
+		return MHD_HTTP_INTERNAL_SERVER_ERROR;
+	}
+	
+	if(sqlite3_bind_int(ppstmt, 1, date_year) != SQLITE_OK || sqlite3_bind_int(ppstmt, 2, date_month) != SQLITE_OK || sqlite3_bind_int(ppstmt, 3, date_day) != SQLITE_OK) {
+		LOG_ERROR("Failed to bind value to prepared statement.");
+		sqlite3_finalize(ppstmt);
+		sqlite3_close(db_conn);
+		
+		return MHD_HTTP_INTERNAL_SERVER_ERROR;
+	}
+	
+	response_array = json_object_new_array();
+	
+	while((result = sqlite3_step(ppstmt)) == SQLITE_ROW) {
+		if(sqlite3_column_int64(ppstmt, 0) != hour) {
+			hour = sqlite3_column_int64(ppstmt, 0);
+			
+			response_item = json_object_new_object();
+			appliance_energy_array = json_object_new_array();
+			appliance_cost_array = json_object_new_array();
+			
+			json_object_object_add_ex(response_item, "hour", json_object_new_int(hour), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+			json_object_object_add_ex(response_item, "appliance_energy", appliance_energy_array, JSON_C_OBJECT_ADD_KEY_IS_NEW);
+			json_object_object_add_ex(response_item, "appliance_cost", appliance_cost_array, JSON_C_OBJECT_ADD_KEY_IS_NEW);
+			
+			json_object_array_add(response_array, response_item);
+		}
+		
+		appliance_id = sqlite3_column_int(ppstmt, 1);
+		
+		if(appliance_id == 0) {
+			json_object_object_add_ex(response_item, "total_energy", json_object_new_double(sqlite3_column_double(ppstmt, 2)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+			json_object_object_add_ex(response_item, "standby_energy", json_object_new_double(sqlite3_column_double(ppstmt, 4) / (60 * 1000)), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		} else {
+			json_object_array_put_idx(appliance_energy_array, appliance_id - 1, json_object_new_double(sqlite3_column_double(ppstmt, 2)));
+			json_object_array_put_idx(appliance_cost_array, appliance_id - 1, json_object_new_double(sqlite3_column_double(ppstmt, 3)));
+		}
+	}
+	
+	sqlite3_finalize(ppstmt);
+	sqlite3_close(db_conn);
+	
+	if(result != SQLITE_DONE) {
+		LOG_ERROR("Failed to fetch disaggregated hourly energy from database: %s", sqlite3_errstr(result));
+		json_object_put(response_array);
+		return MHD_HTTP_INTERNAL_SERVER_ERROR;
+	}
+	
+	*resp_data = strdup(json_object_get_string(response_array));
+	
+	json_object_put(response_array);
+	
+	if(*resp_data == NULL)
+		return MHD_HTTP_INTERNAL_SERVER_ERROR;
+	
+	*resp_data_size = strlen(*resp_data);
+	
+	*resp_content_type = strdup(JSON_CONTENT_TYPE);
+	
+	return MHD_HTTP_OK;
+}
+

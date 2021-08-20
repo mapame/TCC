@@ -169,6 +169,19 @@ static const path_segment_t url_path_tree = {
 				},
 				{}
 			}
+		},{
+			.text = "disaggregated_energy",
+			.children = (const path_segment_t[]) {
+				{
+					.text = "minutes",
+					.get_handler = http_handler_get_disaggregated_energy_minutes,
+				},
+				{
+					.text = "hours",
+					.get_handler = http_handler_get_disaggregated_energy_hours,
+				},
+				{}
+			}
 		},
 		{}
 	}
