@@ -2,28 +2,31 @@ window.onload = function () {
 	authCheckAccessKey(initPage, redirectToLogin);
 	addEventsNavbarBurgers();
 	
+	document.getElementById("checkbox-display-events").checked = false;
+	
 	document.getElementById("button-show-voltage-container").onclick = showVoltageChart;
 	document.getElementById("checkbox-display-events").onchange = changeDisplayEvents;
+	
+	window.smceeHighlightedEvents = new Set();
 	
 	window.smceePowerChart = new Dygraph(document.getElementById("power-chart"), [[0, null]], {
 		labels: ["Hora", "Potência"],
 		xValueParser: function(x) {return x;},
 		drawPoints: false,
-		labelsDiv: document.getElementById("power-chart-labels"),
 		legend: "always",
 		includeZero: true,
 		axes: {
 			y: {
 				axisLabelFormatter: function(x) { return x + " W"; }
 			}
-		}
+		},
+		annotationClickHandler: annotationClickHandler
 	});
 	
 	window.smceeVoltageChart = new Dygraph(document.getElementById("voltage-chart"), [[0, null, null]], {
 		labels: ["Hora", "Fase A", "Fase B"],
 		xValueParser: function(x) {return x;},
 		drawPoints: false,
-		labelsDiv: document.getElementById("voltage-chart-labels"),
 		legend: "always",
 		valueRange: [(127 * 0.75), (127 * 1.25)],
 		axes: {
@@ -54,8 +57,8 @@ function showVoltageChart() {
 }
 
 function changeDisplayEvents() {
-	if(this.checked && typeof window.powerChartAnnotations == "object")
-		window.smceePowerChart.setAnnotations(window.powerChartAnnotations);
+	if(this.checked)
+		updateAnnotations();
 	else
 		window.smceePowerChart.setAnnotations([]);
 }
@@ -166,10 +169,13 @@ function fetchPowerEvents(secondQty) {
 			
 			console.info(responseObject.length + " power events.");
 			
-			window.smceeLoadEvents = responseObject;
+			window.smceeLoadEvents = new Map();
+			
+			for(eventItem of responseObject)
+				window.smceeLoadEvents.set(eventItem.timestamp, eventItem);
 			
 			if(typeof window.smceeApplianceList == "object")
-				generateAnnotations();
+				document.getElementById("checkbox-display-events").disabled = false;
 			
 		} else if(this.status === 401) {
 			redirectToLogin();
@@ -187,24 +193,70 @@ function fetchPowerEvents(secondQty) {
 	xhrPowerEvents.send();
 }
 
-function generateAnnotations() {
-	window.powerChartAnnotations = [];
+function updateAnnotations() {
+	var annotations = [];
 	
 	if(typeof window.smceeLoadEvents != "object" || typeof window.smceeApplianceList != "object")
 		return;
 	
-	for(eventItem of window.smceeLoadEvents) {
-		window.powerChartAnnotations.push({
+	for(eventItem of window.smceeLoadEvents.values()) {
+		let highlighted = window.smceeHighlightedEvents.has(eventItem.timestamp);
+		let annotation = {
 			series: "Potência",
 			x: eventItem.timestamp * 1000,
-			shortText: (eventItem.delta_pt > 0) ? "L" : "D",
-			text: "d: " + eventItem.duration + " secs\ndP: " + eventItem.delta_pt.toFixed(1) + " W (" + eventItem.delta_p[0].toFixed(1) + " | " + eventItem.delta_p[1].toFixed(1) + ")\nPpk: " + eventItem.peak_pt.toFixed(1) + " W\ndQ: " + eventItem.delta_q[0].toFixed(1) + " | " + eventItem.delta_q[1].toFixed(1) + " VAr",
-			tickColor: "gray",
-			tickHeight: 10,
-		});
+			shortText: eventItem.state,
+			//shortText: ((eventItem.delta_pt > 0) ? "L" : "D"),
+			//icon: (eventItem.delta_pt > 0) ? "img/arrow-up-bold-box-outline.png" : "img/arrow-down-bold-box-outline.png",
+			//width: 16,
+			//height: 16,
+			text: "Duração: " + eventItem.duration + " s\ndP: " + eventItem.delta_pt.toFixed(1) + " W (" + eventItem.delta_p[0].toFixed(1) + " | " + eventItem.delta_p[1].toFixed(1) + ")\nPpk: " + eventItem.peak_pt.toFixed(1) + " W\ndS(VA): " + eventItem.delta_s[0].toFixed(1) + " | " + eventItem.delta_s[1].toFixed(1) + "\ndQ(VAr): " + eventItem.delta_q[0].toFixed(1) + " | " + eventItem.delta_q[1].toFixed(1),
+			cssClass: highlighted ? "dygraph-highlighted-annotation" : "",
+			tickHeight: 20,
+			tickColor: highlighted ? "red" : "gray",
+			tickWidth: highlighted ? 3 : 1,
+		};
+		
+		if(eventItem.time_gap > 0)
+			annotation.text += "\nLacuna: " + eventItem.time_gap + " s";
+		
+		if(eventItem.state >= 3)
+			annotation.text += "\n\nAparelho: " + window.smceeApplianceList.get(eventItem.appliance_id).name + " (score: " + eventItem.pair_score + ")";
+		
+		if(eventItem.state >= 2) {
+			annotation.text += "\n\nDesv. Padrão: " + (eventItem.p_sd * 100).toFixed(1) + " %\n";
+			
+			for(let idx = 0; idx < 3 && eventItem.appliance_ids[idx] > 0; idx++)
+				annotation.text += "\n" + window.smceeApplianceList.get(eventItem.appliance_ids[idx]).name + ": " + (eventItem.appliance_probs[idx] * 100).toFixed(1) + " %";
+		
+		}
+		
+		annotations.push(annotation);
 	}
 	
-	document.getElementById("checkbox-display-events").disabled = false;
+	window.smceePowerChart.setAnnotations(annotations);
+}
+
+function annotationClickHandler(annotation, point, dygraph, event) {
+	var loadEvent = window.smceeLoadEvents.get(annotation.x / 1000);
+	var pairLoadEvent;
+	
+	if(typeof loadEvent == "undefined" || loadEvent.state != 3)
+		return;
+	
+	pairLoadEvent = window.smceeLoadEvents.get(loadEvent.pair_timestamp);
+	
+	if(typeof pairLoadEvent == "undefined")
+		return;
+	
+	if(window.smceeHighlightedEvents.has(loadEvent.timestamp) || window.smceeHighlightedEvents.has(pairLoadEvent.timestamp)) {
+		smceeHighlightedEvents.clear();
+	} else {
+		smceeHighlightedEvents.clear();
+		window.smceeHighlightedEvents.add(loadEvent.timestamp);
+		window.smceeHighlightedEvents.add(pairLoadEvent.timestamp);
+	}
+	
+	updateAnnotations();
 }
 
 function fetchApplianceList() {
@@ -222,7 +274,7 @@ function fetchApplianceList() {
 			document.getElementById("button-show-voltage-container").classList.remove("is-loading");
 			
 			if(typeof window.smceeLoadEvents == "object")
-				generateAnnotations()
+				document.getElementById("checkbox-display-events").disabled = false;
 			
 		} else if(this.status === 401) {
 			redirectToLogin();
