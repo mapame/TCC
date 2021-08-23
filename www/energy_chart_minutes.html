@@ -8,7 +8,6 @@
 	
 	<link href="css/materialdesignicons.min.css" media="all" rel="stylesheet" type="text/css">
 	<link rel="stylesheet" href="css/bulma.min.css">
-	<link rel="stylesheet" href="css/custom-elements.css">
 	<link rel="stylesheet" href="css/dygraph.css">
 	
 	<script src="js/dygraph.min.js"></script>
@@ -46,24 +45,26 @@
 				</div>
 				<div class="level-right">
 					<div class="level-item">
-						<input class="input" id="date-input" type="date">
+						<input class="input" id="date-input" type="date" disabled>
 					</div>
 				</div>
 			</div>
-			
-			<div style="width: 100%; font-size: small; text-align: right;" id="chart-labels"></div>
-			<div id="minute-energy-chart" style="width: 100%;"></div>
-			
-			<div class="level mt-2">
+			<div id="minute-energy-chart" class="mt-4" style="width: 100%;"></div>
+			<div class="level mt-4">
 				<div class="level-left">
 					<div class="level-item">
 						<label class="checkbox">
-							<input id="reactive-checkbox" type="checkbox">
-							Energia Reativa
+							<input id="reactive-checkbox" type="checkbox" disabled>
+							Energia reativa
 						</label>
 					</div>
 				</div>
 				<div class="level-right">
+					<label class="checkbox">
+							<input id="stacked-checkbox" type="checkbox" disabled>
+							Gráfico empilhado
+						</label>
+					</div>
 				</div>
 			</div>
 		</div>
