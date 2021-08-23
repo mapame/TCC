@@ -13,6 +13,7 @@
 #include "database.h"
 #include "http.h"
 #include "power.h"
+#include "disaggregation.h"
 
 void *data_acquisition_loop(void *argp);
 void *disaggregation_loop(void *argp);
@@ -92,6 +93,7 @@ int main(int argc, char **argv) {
 	pthread_sigmask(SIG_BLOCK, &signal_set, NULL);
 	
 	load_saved_power_data();
+	load_saved_load_events();
 	
 	LOG_INFO("Starting data acquisition thread.");
 	pthread_create(&data_acquisition_thread, NULL, data_acquisition_loop, (void*) &terminate);
@@ -109,10 +111,14 @@ int main(int argc, char **argv) {
 	
 	http_stop(httpd);
 	
+	LOG_INFO("Waiting for threads to terminate.");
+	
 	pthread_join(data_acquisition_thread, NULL);
 	pthread_join(disaggregation_thread, NULL);
 	
 	close_power_data_file();
+	
+	LOG_INFO("Program terminated.");
 	
 	return 0;
 }

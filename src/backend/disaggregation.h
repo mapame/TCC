@@ -5,6 +5,8 @@
 
 typedef struct load_event_s {
 	time_t timestamp;
+	int state;
+	
 	int time_gap;
 	int duration;
 	double delta_pt;
@@ -17,8 +19,13 @@ typedef struct load_event_s {
 	int appliance_ids[3];
 	double appliance_probs[3];
 	
+	int appliance_id;
+	time_t pair_timestamp;
+	int pair_score;
+	
 } load_event_t;
 
+int load_saved_load_events();
 int get_load_events(time_t timestamp_start, time_t timestamp_end, load_event_t *buffer, int buffer_len);
 
 #endif
