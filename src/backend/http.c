@@ -180,6 +180,14 @@ static const path_segment_t url_path_tree = {
 					.text = "hours",
 					.get_handler = http_handler_get_disaggregated_energy_hours,
 				},
+				{
+					.text = "days",
+					.get_handler = http_handler_get_disaggregated_energy_days,
+				},
+				{
+					.text = "months",
+					.get_handler = http_handler_get_disaggregated_energy_months,
+				},
 				{}
 			}
 		},
