@@ -556,7 +556,7 @@ void *disaggregation_loop(void *argp) {
 		
 		signature_last_modification = get_last_signature_modification();
 		
-		if(signature_last_modification > model_signature_last_modification) {
+		if(signature_last_modification > model_signature_last_modification && (time(NULL) - signature_last_modification) > 30) {
 			model_signature_last_modification = signature_last_modification;
 			
 			signature_qty = fetch_signatures(&signatures, detection_threshold);
