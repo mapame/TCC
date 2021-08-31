@@ -111,7 +111,7 @@ static int import_load_events_from_file(const char *filename, time_t timestamp_l
 				counter[1]++;
 			}
 		} else if(strncmp(line_buffer, "PAIRED,", 7) == 0) {
-			if(sscanf(line_buffer, "PAIRED,%li,%i,%li,%i\n", &load_event.timestamp, &load_event.appliance_id, &load_event.pair_timestamp, &load_event.pair_score) == 2) {
+			if(sscanf(line_buffer, "PAIRED,%li,%i,%li,%i\n", &load_event.timestamp, &load_event.appliance_id, &load_event.pair_timestamp, &load_event.pair_score) == 4) {
 				load_event.state = 3;
 				
 				update_load_event(&load_event);
