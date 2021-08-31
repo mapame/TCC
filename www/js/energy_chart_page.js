@@ -12,11 +12,15 @@ function initPage() {
 	window.smceeEnergyData.type = "";
 	window.smceeEnergyData.energyData = {};
 	window.smceeEnergyData.energyComparisonData = {};
+	window.smceeEnergyData.disaggregatedEnergyData = {};
+	
+	document.getElementById("disaggregated-energy-checkbox").checked = false;
 	
 	document.getElementById("chart-type-select").onchange = changeChartType;
 	document.getElementById("comparison-checkbox").onchange = updateChart;
 	document.getElementById("cost-checkbox").onchange = updateChart;
 	document.getElementById("coverage-checkbox").onchange = updateChart;
+	document.getElementById("disaggregated-energy-checkbox").onchange = updateChart;
 	
 	document.getElementById("date-day-input").onchange = updateChart;
 	document.getElementById("date-month-select").onchange = updateChart;
@@ -72,15 +76,93 @@ function initPage() {
 			},
 			plugins: {
 				legend: {
-					display: false
+					display: true,
+					onClick: handleLegendClick,
 				}
 			}
 		}
 	});
 }
 
+function hsvToRGB(hue, saturation, value) {
+	var red;
+	var green;
+	var blue;
+	if (saturation === 0) {
+		red = value;
+		green = value;
+		blue = value;
+	} else {
+		var i = Math.floor(hue * 6);
+		var f = hue * 6 - i;
+		var p = value * (1 - saturation);
+		var q = value * (1 - saturation * f);
+		var t = value * (1 - saturation * (1 - f));
+		switch (i) {
+			case 1:
+				red = q;
+				green = value;
+				blue = p;
+				break;
+			case 2:
+				red = p;
+				green = value;
+				blue = t;
+				break;
+			case 3:
+				red = p;
+				green = q;
+				blue = value;
+				break;
+			case 4:
+				red = t;
+				green = p;
+				blue = value;
+				break;
+			case 5:
+				red = value;
+				green = p;
+				blue = q;
+				break;
+			case 6: // fall through
+			case 0:
+				red = value;
+				green = t;
+				blue = p;
+				break;
+		}
+	}
+	red = Math.floor(255 * red + 0.5);
+	green = Math.floor(255 * green + 0.5);
+	blue = Math.floor(255 * blue + 0.5);
+	
+	return "#" + red.toString(16).padStart(2, "0") + green.toString(16).padStart(2, "0") + blue.toString(16).padStart(2, "0");
+}
+
 function daysInMonth(month, year) {
     return new Date(year, month, 0).getDate();
+}
+
+function handleLegendClick(evt, item, legend) {
+	if(typeof window.smceeHighlightedDataset == "string" && item.text === window.smceeHighlightedDataset) {
+		legend.chart.data.datasets.forEach((dataset) => {
+			dataset.backgroundColor = (dataset.backgroundColor.length === 9) ? dataset.backgroundColor.slice(0, -2) : dataset.backgroundColor;
+		});
+		
+		window.smceeHighlightedDataset = null;
+	} else {
+		legend.chart.data.datasets.forEach((dataset) => {
+			if(dataset.label === item.text) {
+				dataset.backgroundColor = (dataset.backgroundColor.length === 9) ? dataset.backgroundColor.slice(0, -2) : dataset.backgroundColor;
+			} else {
+				dataset.backgroundColor = dataset.backgroundColor + ((dataset.backgroundColor.length === 9) ? '' : '46');
+			}
+		});
+
+		window.smceeHighlightedDataset = item.text;
+	}
+
+	legend.chart.update();
 }
 
 function fillDateInputs(yearArray, lastEnergyMinuteTimestamp) {
@@ -180,6 +262,7 @@ function changeChartType() {
 	
 	window.smceeEnergyData.energyData.date = "";
 	window.smceeEnergyData.energyComparisonData.date = "";
+	window.smceeEnergyData.disaggregatedEnergyData.date = "";
 	
 	updateChart();
 }
@@ -198,6 +281,8 @@ function fetchEnergyDateInfo() {
 			
 			changeChartType();
 			
+			fetchApplianceNames();
+			
 		} else if(this.status === 401) {
 			redirectToLogin();
 		} else {
@@ -214,40 +299,145 @@ function fetchEnergyDateInfo() {
 	xhrEnergyDates.send();
 }
 
-function fetchEnergyData(energyDataType, comparisonData=false) {
-	var date = comparisonData ? window.smceeEnergyData.energyComparisonData.date : window.smceeEnergyData.energyData.date;
+function fetchApplianceNames() {
+	var xhrApplianceList = new XMLHttpRequest();
+	
+	xhrApplianceList.onload = function() {
+		if(this.status === 200) {
+			var responseObject = JSON.parse(this.responseText);
+			
+			window.smceeApplianceNames = new Map();
+			
+			for(const applianceItem of responseObject)
+				window.smceeApplianceNames.set(applianceItem.id, applianceItem.name);
+			
+			document.getElementById("disaggregated-energy-checkbox").disabled = false;
+			
+		} else if(this.status === 401) {
+			redirectToLogin();
+		} else {
+			console.error("Failed to fetch appliance list. Status: " + this.status);
+		}
+	}
+	
+	xhrApplianceList.open("GET", window.smceeApiUrlBase + "appliances");
+	
+	xhrApplianceList.timeout = 2000;
+	
+	xhrApplianceList.setRequestHeader("Authorization", "Bearer " + localStorage.getItem("access_key"));
+	
+	xhrApplianceList.send();
+}
+
+function formatEnergyData(receivedEnergyData, energyDataType, comparisonData) {
+	var energyTarget = comparisonData ? window.smceeEnergyData.energyComparisonData : window.smceeEnergyData.energyData;
+	
+	energyTarget.energy = [];
+	energyTarget.cost = [];
+	energyTarget.coverage = [];
+	
+	for(const element of receivedEnergyData) {
+		let idx = (energyDataType == "months" ? element.month - 1 : (energyDataType == "days" ? element.day - 1 : element.hour));
+		let totalSeconds = 3600 * (energyDataType == "months" ? daysInMonth(element.month, Number(energyTarget.date)) * 24 : (energyDataType == "days" ? 24 : 1));
+		
+		energyTarget.energy[idx] = element.active.toFixed(2);
+		energyTarget.cost[idx] = element.cost.toFixed(2);
+		energyTarget.coverage[idx] = ((element.second_count / totalSeconds) * 100).toFixed(1);
+	}
+}
+
+function formatDisaggregatedEnergyData(receivedEnergyData, energyDataType, applianceQty) {
+	var numRows = 0;
+	
+	if(applianceQty <= 0)
+		return;
+	
+	window.smceeEnergyData.disaggregatedEnergyData.totalStandbyEnergy = 0;
+	window.smceeEnergyData.disaggregatedEnergyData.totalUnknownEnergy = 0;
+	window.smceeEnergyData.disaggregatedEnergyData.applianceTotalEnergy = new Array(applianceQty).fill(0);
+	window.smceeEnergyData.disaggregatedEnergyData.applianceTotalCost = new Array(applianceQty).fill(0);
+	
+	for(const element of receivedEnergyData) {
+		let applianceEnergyTotal = 0;
+		
+		for(let applianceId = 0; applianceId < applianceQty; applianceId++) {
+			if(typeof element.appliance_energy[applianceId] == "undefined")
+				break;
+			
+			window.smceeEnergyData.disaggregatedEnergyData.applianceTotalEnergy[applianceId] += element.appliance_energy[applianceId];
+			window.smceeEnergyData.disaggregatedEnergyData.applianceTotalCost[applianceId] += element.appliance_cost[applianceId];
+			
+			applianceEnergyTotal += element.appliance_energy[applianceId];
+		}
+		
+		window.smceeEnergyData.disaggregatedEnergyData.totalStandbyEnergy += element.standby_energy;
+		window.smceeEnergyData.disaggregatedEnergyData.totalUnknownEnergy += Math.max(0, element.total_energy - applianceEnergyTotal);
+		
+		numRows = Math.max(numRows, (energyDataType == "months" ? element.month : (energyDataType == "days" ? element.day : element.hour + 1)));
+	}
+	
+	window.smceeEnergyData.disaggregatedEnergyData.standbyEnergy = new Array(numRows).fill(0);
+	window.smceeEnergyData.disaggregatedEnergyData.unknownEnergy = new Array(numRows).fill(0);
+	
+	window.smceeEnergyData.disaggregatedEnergyData.applianceEnergy = new Map();
+	window.smceeEnergyData.disaggregatedEnergyData.applianceCost = new Map();
+	
+	for(let applianceId = 0; applianceId < applianceQty; applianceId++) {
+		if(window.smceeEnergyData.disaggregatedEnergyData.applianceTotalEnergy[applianceId] > 0) {
+			window.smceeEnergyData.disaggregatedEnergyData.applianceEnergy.set(applianceId, new Array(numRows).fill(0));
+			window.smceeEnergyData.disaggregatedEnergyData.applianceCost.set(applianceId, new Array(numRows).fill(0));
+		}
+	}
+	
+	for(const element of receivedEnergyData) {
+		let applianceEnergyTotal = 0;
+		let index = energyDataType == "months" ? element.month - 1 : (energyDataType == "days" ? element.day - 1 : element.hour);
+		
+		for(const applianceId of window.smceeEnergyData.disaggregatedEnergyData.applianceEnergy.keys()) {
+			if(typeof element.appliance_energy[applianceId] == "undefined")
+				continue;
+			
+			window.smceeEnergyData.disaggregatedEnergyData.applianceEnergy.get(applianceId)[index] += element.appliance_energy[applianceId];
+			window.smceeEnergyData.disaggregatedEnergyData.applianceCost.get(applianceId)[index] += element.appliance_cost[applianceId];
+			
+			applianceEnergyTotal += element.appliance_energy[applianceId];
+		}
+		
+		window.smceeEnergyData.disaggregatedEnergyData.standbyEnergy[index] = element.standby_energy;
+		window.smceeEnergyData.disaggregatedEnergyData.unknownEnergy[index] = Math.max(0, element.total_energy - applianceEnergyTotal);
+	}
+	
+}
+
+function fetchEnergyData(energyDataType, disaggregatedEnergy=false, comparisonData=false) {
+	var date = disaggregatedEnergy ? window.smceeEnergyData.disaggregatedEnergyData.date : (comparisonData ? window.smceeEnergyData.energyComparisonData.date : window.smceeEnergyData.energyData.date);
 	var xhrEnergyData = new XMLHttpRequest();
-	var requestUrl = window.smceeApiUrlBase + "energy/";
+	var requestUrl = window.smceeApiUrlBase + (disaggregatedEnergy ? "disaggregated_energy/" : "energy/");
 	
 	document.getElementById('chart-type-select').disabled = true;
 	document.getElementById('comparison-checkbox').disabled = true;
 	document.getElementById('cost-checkbox').disabled = true;
 	document.getElementById('coverage-checkbox').disabled = true;
+	document.getElementById("disaggregated-energy-checkbox").disabled = true;
 	
 	xhrEnergyData.onload = function() {
 		if(this.status == 200) {
 			let responseObj = JSON.parse(this.responseText);
 			let energyTarget = comparisonData ? window.smceeEnergyData.energyComparisonData : window.smceeEnergyData.energyData;
 			
-			energyTarget.energy = [];
-			energyTarget.cost = [];
-			energyTarget.coverage = [];
-			
-			for(const element of responseObj) {
-				let idx = (energyDataType == "months" ? element.month - 1 : (energyDataType == "days" ? element.day - 1 : element.hour));
-				let totalSeconds = 3600 * (energyDataType == "months" ? daysInMonth(element.month, Number(date)) * 24 : (energyDataType == "days" ? 24 : 1));
-				
-				energyTarget.energy[idx] = element.active.toFixed(2);
-				energyTarget.cost[idx] = element.cost.toFixed(2);
-				energyTarget.coverage[idx] = ((element.second_count / totalSeconds) * 100).toFixed(1);
+			if(disaggregatedEnergy) {
+				formatDisaggregatedEnergyData(responseObj, energyDataType, window.smceeApplianceNames.size);
+			} else {
+				formatEnergyData(responseObj, energyDataType, comparisonData)
 			}
 			
-			document.getElementById('chart-type-select').disabled = false;
-			document.getElementById('comparison-checkbox').disabled = false;
-			document.getElementById('cost-checkbox').disabled = false;
-			document.getElementById('coverage-checkbox').disabled = false;
-			
 			updateChart();
+			
+			document.getElementById('chart-type-select').disabled = false;
+			document.getElementById('comparison-checkbox').disabled = disaggregatedEnergy;
+			document.getElementById('cost-checkbox').disabled = disaggregatedEnergy;
+			document.getElementById('coverage-checkbox').disabled = disaggregatedEnergy;
+			document.getElementById("disaggregated-energy-checkbox").disabled = (typeof window.smceeApplianceNames == "undefined");
 			
 		} else if(this.status === 401) {
 			redirectToLogin();
@@ -277,15 +467,30 @@ function updateChart() {
 	var comparisonCheckbox = document.getElementById("comparison-checkbox");
 	var costCheckbox = document.getElementById('cost-checkbox');
 	var coverageCheckbox = document.getElementById("coverage-checkbox");
+	var disaggregatedEnergyCheckbox = document.getElementById("disaggregated-energy-checkbox");
 	let selectedDate, selectedComparisonDate;
 	
-	if(comparisonCheckbox.checked) {
+	if(disaggregatedEnergyCheckbox.checked) {
+		comparisonCheckbox.checked = false;
+		comparisonCheckbox.disabled = true;
+		
+		coverageCheckbox.checked = false;
+		coverageCheckbox.disabled = true;
+		
+		costCheckbox.checked = false;
+		costCheckbox.disabled = true;
+		
+	} else if(comparisonCheckbox.checked) {
 		document.getElementById("comparison-date-item").classList.remove("is-hidden");
 		coverageCheckbox.checked = false;
 		coverageCheckbox.disabled = true;
+		
+		costCheckbox.disabled = false;
 	} else {
 		document.getElementById("comparison-date-item").classList.add("is-hidden");
 		coverageCheckbox.disabled = false;
+		
+		costCheckbox.disabled = false;
 	}
 	
 	if(selectedType == "months") {
@@ -302,16 +507,25 @@ function updateChart() {
 	if(selectedDate.length < 1 || (comparisonCheckbox.checked && selectedComparisonDate.length < 1))
 		return;
 	
-	if(window.smceeEnergyData.energyData.date !== selectedDate) {
-		window.smceeEnergyData.energyData.date = selectedDate;
-		fetchEnergyData(selectedType, false);
-		return;
-	}
-	
-	if(comparisonCheckbox.checked && window.smceeEnergyData.energyComparisonData.date !== selectedComparisonDate) {
-		window.smceeEnergyData.energyComparisonData.date = selectedComparisonDate;
-		fetchEnergyData(selectedType, true);
-		return;
+	if(disaggregatedEnergyCheckbox.checked) {
+		if(window.smceeEnergyData.disaggregatedEnergyData.date !== selectedDate) {
+			window.smceeEnergyData.disaggregatedEnergyData.date = selectedDate;
+			fetchEnergyData(selectedType, true, false);
+			return;
+		}
+		
+	} else {
+		if(window.smceeEnergyData.energyData.date !== selectedDate) {
+			window.smceeEnergyData.energyData.date = selectedDate;
+			fetchEnergyData(selectedType, false, false);
+			return;
+		}
+		
+		if(comparisonCheckbox.checked && window.smceeEnergyData.energyComparisonData.date !== selectedComparisonDate) {
+			window.smceeEnergyData.energyComparisonData.date = selectedComparisonDate;
+			fetchEnergyData(selectedType, false, true);
+			return;
+		}
 	}
 	
 	window.smceeEnergyChart.data.labels = [];
@@ -333,10 +547,40 @@ function updateChart() {
 	
 	window.smceeEnergyChart.data.datasets = [];
 	
-	if(costCheckbox.checked) {
+	if(disaggregatedEnergyCheckbox.checked) {
+		let hue = 0.2;
+		let sat = 0.5;
+		let val = 0.8;
+		
+		window.smceeEnergyChart.data.datasets.push({
+			label: 'Stand-by',
+			backgroundColor: '#3c3c3c',
+			data: window.smceeEnergyData.disaggregatedEnergyData.standbyEnergy,
+			yAxisID: 'y',
+		});
+		
+		window.smceeEnergyChart.data.datasets.push({
+			label: 'Desconhecido',
+			backgroundColor: '#b4b4b4',
+			data: window.smceeEnergyData.disaggregatedEnergyData.unknownEnergy,
+			yAxisID: 'y',
+		});
+		
+		for(const applianceId of window.smceeEnergyData.disaggregatedEnergyData.applianceEnergy.keys()) {
+			window.smceeEnergyChart.data.datasets.push({
+				label: window.smceeApplianceNames.get(applianceId + 1),
+				backgroundColor: hsvToRGB(hue, sat, val),
+				data: window.smceeEnergyData.disaggregatedEnergyData.applianceEnergy.get(applianceId),
+				yAxisID: 'y',
+			});
+			
+			hue = (hue + 0.618033988749895) % 1;
+		}
+		
+	} else if(costCheckbox.checked) {
 		window.smceeEnergyChart.data.datasets.push({
 			label: 'Custo',
-			backgroundColor: 'rgb(0, 209, 178)',
+			backgroundColor: '#00d1b2',
 			data: window.smceeEnergyData.energyData.cost,
 			yAxisID: 'y',
 		});
@@ -344,7 +588,7 @@ function updateChart() {
 		if(comparisonCheckbox.checked) {
 			window.smceeEnergyChart.data.datasets.push({
 				label: 'Custo',
-				backgroundColor: 'rgb(62, 142, 208)',
+				backgroundColor: '#3e8ed0',
 				data: window.smceeEnergyData.energyComparisonData.cost,
 				yAxisID: 'y',
 			});
@@ -354,7 +598,7 @@ function updateChart() {
 	} else {
 		window.smceeEnergyChart.data.datasets = [{
 			label: 'Energia',
-			backgroundColor: 'rgb(0, 209, 178)',
+			backgroundColor: '#00d1b2',
 			data: window.smceeEnergyData.energyData.energy,
 			yAxisID: 'y',
 		}];
@@ -362,7 +606,7 @@ function updateChart() {
 		if(comparisonCheckbox.checked) {
 			window.smceeEnergyChart.data.datasets.push({
 				label: 'Energia',
-				backgroundColor: 'rgb(62, 142, 208)',
+				backgroundColor: '#3e8ed0',
 				data: window.smceeEnergyData.energyComparisonData.energy,
 				yAxisID: 'y',
 			});
@@ -371,17 +615,20 @@ function updateChart() {
 		window.smceeEnergyChart.options.scales.y.title.text = 'Energia (kWh)';
 	}
 	
-	if(coverageCheckbox.checked) {
+	if(!disaggregatedEnergyCheckbox.checked && coverageCheckbox.checked) {
 		window.smceeEnergyChart.data.datasets.push({
 			label: 'Cobertura',
-			backgroundColor: 'rgb(180, 180, 180)',
+			backgroundColor: '#b4b4b4',
 			data: window.smceeEnergyData.energyData.coverage,
 			type: 'line',
 			yAxisID: 'y1',
 		});
 	}
 	
-	window.smceeEnergyChart.options.scales.y1.display = coverageCheckbox.checked;
+	window.smceeEnergyChart.options.scales.x.stacked = disaggregatedEnergyCheckbox.checked;
+	window.smceeEnergyChart.options.scales.y.stacked = disaggregatedEnergyCheckbox.checked;
+	window.smceeEnergyChart.options.scales.y1.display = !disaggregatedEnergyCheckbox.checked && coverageCheckbox.checked;
+	window.smceeEnergyChart.options.plugins.legend.display = disaggregatedEnergyCheckbox.checked;
 	
 	window.smceeEnergyChart.update();
 }
