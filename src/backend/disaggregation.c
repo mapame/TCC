@@ -83,7 +83,9 @@ static int import_load_events_from_file(const char *filename, time_t timestamp_l
 	FILE *le_file = NULL;
 	char line_buffer[128];
 	load_event_t load_event;
-	int counter[3] = {0};
+	int line_counter = 0;
+	int type_counter[3] = {0};
+	int error_counter = 0;
 	
 	if((le_file = fopen(filename, "r")) == NULL) {
 		LOG_ERROR("Failed to open load events file \"%s\": %s", filename, strerror(errno));
@@ -93,6 +95,8 @@ static int import_load_events_from_file(const char *filename, time_t timestamp_l
 	while(fgets(line_buffer, sizeof(line_buffer), le_file)) {
 		memset(&load_event, 0, sizeof(load_event_t));
 		
+		line_counter++;
+		
 		if(strncmp(line_buffer, "DETECTED,", 9) == 0) {
 			if(sscanf(line_buffer, "DETECTED,%li,%i,%i,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf", &load_event.timestamp, &load_event.time_gap, &load_event.duration, &load_event.delta_pt, &load_event.peak_pt, &load_event.delta_p[0], &load_event.delta_p[1], &load_event.delta_s[0], &load_event.delta_s[1], &load_event.delta_q[0], &load_event.delta_q[1]) == 11) {
 				load_event.state = 1;
@@ -100,30 +104,39 @@ static int import_load_events_from_file(const char *filename, time_t timestamp_l
 				if(load_event.timestamp > timestamp_limit) {
 					add_load_event(&load_event, 0);
 				
-				counter[0]++;}
+				type_counter[0]++;}
+			} else {
+				error_counter++;
 			}
+			
 		} else if(strncmp(line_buffer, "PREDICTED,", 10) == 0) {
 			if(sscanf(line_buffer, "PREDICTED,%li,%lf,%i,%i,%i,%lf,%lf,%lf\n", &load_event.timestamp, &load_event.p_sd, &load_event.appliance_ids[0], &load_event.appliance_ids[1], &load_event.appliance_ids[2], &load_event.appliance_probs[0], &load_event.appliance_probs[1], &load_event.appliance_probs[2]) == 8) {
 				load_event.state = 2;
 				
 				update_load_event(&load_event);
 				
-				counter[1]++;
+				type_counter[1]++;
+			} else {
+				error_counter++;
 			}
+			
 		} else if(strncmp(line_buffer, "PAIRED,", 7) == 0) {
 			if(sscanf(line_buffer, "PAIRED,%li,%i,%li,%i\n", &load_event.timestamp, &load_event.appliance_id, &load_event.pair_timestamp, &load_event.pair_score) == 4) {
 				load_event.state = 3;
 				
 				update_load_event(&load_event);
 				
-				counter[2]++;
+				type_counter[2]++;
+			} else {
+				error_counter++;
 			}
+			
 		} else {
-			LOG_WARN("Invalid line in load event file.");
+			error_counter++;
 		}
 	}
 	
-	LOG_INFO("Loaded %i lines from load event file. (%i DET, %i PRE, %i PAI)", counter[0] + counter[1] + counter[2], counter[0], counter[1], counter[2]);
+	LOG_INFO("Loaded %i lines from load event file. (%i DET, %i PRE, %i PAI, %i errors)", line_counter, type_counter[0], type_counter[1], type_counter[2], error_counter);
 	
 	return 0;
 }
