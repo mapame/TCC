@@ -737,7 +737,7 @@ unsigned int http_handler_get_disaggregated_energy_days(struct MHD_Connection *c
 	int result;
 	sqlite3 *db_conn = NULL;
 	sqlite3_stmt *ppstmt = NULL;
-	const char sql_get_dis_energy_days[] = "SELECT day, 0 AS appliance_id, energy_days.active, energy_days.cost, energy_months.min_p FROM energy_days LEFT JOIN energy_months ON energy_days.year = energy_days.year AND energy_days.month = energy_months.month WHERE energy_days.year = ?1 AND energy_days.month = ?2 UNION SELECT day, appliance_id, active, cost, 0 AS min_p FROM disaggregated_energy_days WHERE disaggregated_energy_days.year = ?1 AND disaggregated_energy_hours.days = ?2;";
+	const char sql_get_dis_energy_days[] = "SELECT day, 0 AS appliance_id, energy_days.active, energy_days.cost, energy_months.min_p FROM energy_days LEFT JOIN energy_months ON energy_days.year = energy_days.year AND energy_days.month = energy_months.month WHERE energy_days.year = ?1 AND energy_days.month = ?2 UNION SELECT day, appliance_id, active, cost, 0 AS min_p FROM disaggregated_energy_days WHERE disaggregated_energy_days.year = ?1 AND disaggregated_energy_days.month = ?2;";
 	
 	int day = -1;
 	int appliance_id;
@@ -849,7 +849,7 @@ unsigned int http_handler_get_disaggregated_energy_months(struct MHD_Connection 
 	int result;
 	sqlite3 *db_conn = NULL;
 	sqlite3_stmt *ppstmt = NULL;
-	const char sql_get_dis_energy_months[] = "SELECT month, 0 AS appliance_id, active, cost, min_p FROM energy_months WHERE energy_days.year = ?1 UNION SELECT month, appliance_id, active, cost, 0 AS min_p FROM disaggregated_energy_months WHERE disaggregated_energy_days.year = ?1;";
+	const char sql_get_dis_energy_months[] = "SELECT month, 0 AS appliance_id, active, cost, min_p FROM energy_months WHERE energy_months.year = ?1 UNION SELECT month, appliance_id, active, cost, 0 AS min_p FROM disaggregated_energy_months WHERE disaggregated_energy_months.year = ?1;";
 	
 	int month = -1;
 	int appliance_id;
