@@ -30,7 +30,7 @@ function initPage() {
 	document.getElementById("comparison-date-month-select").onchange = updateChart;
 	document.getElementById("comparison-date-year-select").onchange = updateChart;
 	
-	window.smceeEnergyChart = new Chart(document.getElementById('energy-chart-canvas'), {
+	window.smceeEnergyBarChart = new Chart(document.getElementById('energy-bar-chart-canvas'), {
 		type: 'bar',
 		data: {
 			datasets: []
@@ -78,6 +78,25 @@ function initPage() {
 				legend: {
 					display: true,
 					onClick: handleLegendClick,
+				}
+			}
+		}
+	});
+	
+	window.smceeEnergyPieChart = new Chart(document.getElementById('energy-pie-chart-canvas'), {
+		type: 'pie',
+		data: {
+			datasets: []
+		},
+		options: {
+			responsive: true,
+			maintainAspectRatio: false,
+			animation: {
+				duration: 0
+			},
+			plugins: {
+				legend: {
+					display: false,
 				}
 			}
 		}
@@ -480,17 +499,21 @@ function updateChart() {
 		costCheckbox.checked = false;
 		costCheckbox.disabled = true;
 		
-	} else if(comparisonCheckbox.checked) {
-		document.getElementById("comparison-date-item").classList.remove("is-hidden");
-		coverageCheckbox.checked = false;
-		coverageCheckbox.disabled = true;
+		document.getElementById("energy-pie-chart-canvas").parentNode.classList.remove("is-hidden");
 		
-		costCheckbox.disabled = false;
 	} else {
-		document.getElementById("comparison-date-item").classList.add("is-hidden");
-		coverageCheckbox.disabled = false;
+		document.getElementById("energy-pie-chart-canvas").parentNode.classList.add("is-hidden");
 		
 		costCheckbox.disabled = false;
+		
+		if(comparisonCheckbox.checked) {
+			document.getElementById("comparison-date-item").classList.remove("is-hidden");
+			coverageCheckbox.checked = false;
+			coverageCheckbox.disabled = true;
+		} else {
+			document.getElementById("comparison-date-item").classList.add("is-hidden");
+			coverageCheckbox.disabled = false;
+		}
 	}
 	
 	if(selectedType == "months") {
@@ -528,38 +551,54 @@ function updateChart() {
 		}
 	}
 	
-	window.smceeEnergyChart.data.labels = [];
+	window.smceeEnergyBarChart.data.labels = [];
 	
 	if(selectedType == "hours") {
 		for(let hour = 0; hour < 24; hour++)
-			window.smceeEnergyChart.data.labels.push(hour + ":00");
+			window.smceeEnergyBarChart.data.labels.push(hour + ":00");
 		
 	} else if(selectedType == "days") {
 		let days = Math.max(daysInMonth(selectedDate.split("-")[0], selectedDate.split("-")[1]), (comparisonCheckbox.checked ? daysInMonth(selectedComparisonDate.split("-")[0], selectedComparisonDate.split("-")[1]) : 0));
 		
 		for(let day = 1; day <= days; day++)
-			window.smceeEnergyChart.data.labels.push(day.toString());
+			window.smceeEnergyBarChart.data.labels.push(day.toString());
 		
 	} else if(selectedType == "months") {
 		for(let month of ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"])
-			window.smceeEnergyChart.data.labels.push(month);
+			window.smceeEnergyBarChart.data.labels.push(month);
 	}
 	
-	window.smceeEnergyChart.data.datasets = [];
+	window.smceeEnergyBarChart.data.datasets = [];
+	window.smceeEnergyPieChart.data.datasets = [];
 	
 	if(disaggregatedEnergyCheckbox.checked) {
 		let hue = 0.2;
 		let sat = 0.5;
 		let val = 0.8;
 		
-		window.smceeEnergyChart.data.datasets.push({
+		window.smceeEnergyPieChart.data.labels = [];
+		window.smceeEnergyPieChart.data.datasets.push({
+			label: 'Energia',
+			backgroundColor: [],
+			data: [],
+		});
+		
+		window.smceeEnergyPieChart.data.datasets[0].data.push(window.smceeEnergyData.disaggregatedEnergyData.totalStandbyEnergy);
+		window.smceeEnergyPieChart.data.datasets[0].backgroundColor.push('#3c3c3c');
+		window.smceeEnergyPieChart.data.labels.push('Stand-by');
+		
+		window.smceeEnergyPieChart.data.datasets[0].data.push(window.smceeEnergyData.disaggregatedEnergyData.totalUnknownEnergy);
+		window.smceeEnergyPieChart.data.datasets[0].backgroundColor.push('#b4b4b4');
+		window.smceeEnergyPieChart.data.labels.push('Desconhecido');
+		
+		window.smceeEnergyBarChart.data.datasets.push({
 			label: 'Stand-by',
 			backgroundColor: '#3c3c3c',
 			data: window.smceeEnergyData.disaggregatedEnergyData.standbyEnergy,
 			yAxisID: 'y',
 		});
 		
-		window.smceeEnergyChart.data.datasets.push({
+		window.smceeEnergyBarChart.data.datasets.push({
 			label: 'Desconhecido',
 			backgroundColor: '#b4b4b4',
 			data: window.smceeEnergyData.disaggregatedEnergyData.unknownEnergy,
@@ -567,18 +606,24 @@ function updateChart() {
 		});
 		
 		for(const applianceId of window.smceeEnergyData.disaggregatedEnergyData.applianceEnergy.keys()) {
-			window.smceeEnergyChart.data.datasets.push({
+			hue = (hue + 0.618033988749895) % 1;
+			
+			window.smceeEnergyBarChart.data.datasets.push({
 				label: window.smceeApplianceNames.get(applianceId + 1),
 				backgroundColor: hsvToRGB(hue, sat, val),
 				data: window.smceeEnergyData.disaggregatedEnergyData.applianceEnergy.get(applianceId),
 				yAxisID: 'y',
 			});
 			
-			hue = (hue + 0.618033988749895) % 1;
+			window.smceeEnergyPieChart.data.datasets[0].data.push(window.smceeEnergyData.disaggregatedEnergyData.applianceTotalEnergy[applianceId]);
+			window.smceeEnergyPieChart.data.datasets[0].backgroundColor.push(hsvToRGB(hue, sat, val));
+			window.smceeEnergyPieChart.data.labels.push(window.smceeApplianceNames.get(applianceId + 1));
 		}
 		
+		window.smceeEnergyPieChart.update();
+		
 	} else if(costCheckbox.checked) {
-		window.smceeEnergyChart.data.datasets.push({
+		window.smceeEnergyBarChart.data.datasets.push({
 			label: 'Custo',
 			backgroundColor: '#00d1b2',
 			data: window.smceeEnergyData.energyData.cost,
@@ -586,7 +631,7 @@ function updateChart() {
 		});
 		
 		if(comparisonCheckbox.checked) {
-			window.smceeEnergyChart.data.datasets.push({
+			window.smceeEnergyBarChart.data.datasets.push({
 				label: 'Custo',
 				backgroundColor: '#3e8ed0',
 				data: window.smceeEnergyData.energyComparisonData.cost,
@@ -594,9 +639,9 @@ function updateChart() {
 			});
 		}
 		
-		window.smceeEnergyChart.options.scales.y.title.text = 'Custo (R$)';
+		window.smceeEnergyBarChart.options.scales.y.title.text = 'Custo (R$)';
 	} else {
-		window.smceeEnergyChart.data.datasets = [{
+		window.smceeEnergyBarChart.data.datasets = [{
 			label: 'Energia',
 			backgroundColor: '#00d1b2',
 			data: window.smceeEnergyData.energyData.energy,
@@ -604,7 +649,7 @@ function updateChart() {
 		}];
 		
 		if(comparisonCheckbox.checked) {
-			window.smceeEnergyChart.data.datasets.push({
+			window.smceeEnergyBarChart.data.datasets.push({
 				label: 'Energia',
 				backgroundColor: '#3e8ed0',
 				data: window.smceeEnergyData.energyComparisonData.energy,
@@ -612,11 +657,11 @@ function updateChart() {
 			});
 		}
 		
-		window.smceeEnergyChart.options.scales.y.title.text = 'Energia (kWh)';
+		window.smceeEnergyBarChart.options.scales.y.title.text = 'Energia (kWh)';
 	}
 	
 	if(!disaggregatedEnergyCheckbox.checked && coverageCheckbox.checked) {
-		window.smceeEnergyChart.data.datasets.push({
+		window.smceeEnergyBarChart.data.datasets.push({
 			label: 'Cobertura',
 			backgroundColor: '#b4b4b4',
 			data: window.smceeEnergyData.energyData.coverage,
@@ -625,10 +670,10 @@ function updateChart() {
 		});
 	}
 	
-	window.smceeEnergyChart.options.scales.x.stacked = disaggregatedEnergyCheckbox.checked;
-	window.smceeEnergyChart.options.scales.y.stacked = disaggregatedEnergyCheckbox.checked;
-	window.smceeEnergyChart.options.scales.y1.display = !disaggregatedEnergyCheckbox.checked && coverageCheckbox.checked;
-	window.smceeEnergyChart.options.plugins.legend.display = disaggregatedEnergyCheckbox.checked;
+	window.smceeEnergyBarChart.options.scales.x.stacked = disaggregatedEnergyCheckbox.checked;
+	window.smceeEnergyBarChart.options.scales.y.stacked = disaggregatedEnergyCheckbox.checked;
+	window.smceeEnergyBarChart.options.scales.y1.display = !disaggregatedEnergyCheckbox.checked && coverageCheckbox.checked;
+	window.smceeEnergyBarChart.options.plugins.legend.display = disaggregatedEnergyCheckbox.checked;
 	
-	window.smceeEnergyChart.update();
+	window.smceeEnergyBarChart.update();
 }
