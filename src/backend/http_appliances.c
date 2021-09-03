@@ -316,7 +316,7 @@ unsigned int http_handler_create_appliance(struct MHD_Connection *conn,
 	int result;
 	sqlite3 *db_conn = NULL;
 	sqlite3_stmt *ppstmt = NULL;
-	const char sql_get_appliance[] = "INSERT INTO appliances(name,creator_id,is_active,power,is_hardwired,creation_date,modification_date) VALUES(?1, ?2, ?3, ?4, ?5, ?5, ?6);";
+	const char sql_get_appliance[] = "INSERT INTO appliances(name,creator_id,is_active,power,is_hardwired,creation_date,modification_date) VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?6);";
 	int new_appliance_id;
 	
 	if(logged_user_id <= 0 || users_check_admin(logged_user_id) == 0)
