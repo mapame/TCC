@@ -39,8 +39,8 @@ static void signature_to_features(const load_signature_t *signature, double *fea
 	feature_array[1] = signature->delta_p[1];
 	feature_array[2] = signature->delta_s[0];
 	feature_array[3] = signature->delta_s[1];
-	feature_array[3] = signature->duration;
-	feature_array[4] = signature->peak_pt;
+	feature_array[4] = signature->duration;
+	feature_array[5] = signature->peak_pt;
 }
 
 static void load_event_to_features(load_event_t *l_event, double *feature_array) {
@@ -51,8 +51,8 @@ static void load_event_to_features(load_event_t *l_event, double *feature_array)
 	feature_array[1] = l_event->delta_p[1];
 	feature_array[2] = l_event->delta_s[0];
 	feature_array[3] = l_event->delta_s[1];
-	feature_array[3] = l_event->duration;
-	feature_array[4] = l_event->peak_pt;
+	feature_array[4] = l_event->duration;
+	feature_array[5] = l_event->peak_pt;
 }
 
 static void svm_print_string_f(const char *s) {
