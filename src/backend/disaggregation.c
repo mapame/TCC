@@ -21,7 +21,7 @@
 #include "disaggregation.h"
 
 #define LOAD_EVENT_BUFFER_SIZE 10000
-#define DISAGGREGATION_BUFFER_SIZE 10
+#define DISAGGREGATION_BUFFER_SIZE 8
 #define MAX_TIME_GAP 4
 #define TRAINING_MIN_SIGNATURE_QTY 10
 
@@ -274,13 +274,15 @@ static time_t detect_load_events(time_t last_timestamp, double detection_thresho
 		if(time_gap > MAX_TIME_GAP)
 			continue;
 		
-		if(fabs(ptotal_buffer[1] - ptotal_buffer[0]) < (fabs(ptotal_buffer[3] - ptotal_buffer[1]) * 0.5) && fabs(ptotal_buffer[2] - ptotal_buffer[1]) > (detection_threshold * 0.2) && fabs(ptotal_buffer[3] - ptotal_buffer[1]) > (detection_threshold * 0.2)) {
+		if(fabs(ptotal_buffer[1] - ptotal_buffer[0]) < (detection_threshold * 0.5) && fabs(ptotal_buffer[2] - ptotal_buffer[1]) > (detection_threshold * 0.5) && fabs(ptotal_buffer[3] - ptotal_buffer[1]) > detection_threshold) {
+			
 			pavg_before = (ptotal_buffer[0] + ptotal_buffer[1]) / 2.0;
 			
 			for(int k = 3; k < DISAGGREGATION_BUFFER_SIZE - 2; k++) {
 				pavg_after = (ptotal_buffer[k] + ptotal_buffer[k + 1]) / 2.0;
 				
-				if(fabs(pavg_after - pavg_before) > detection_threshold && fabs(ptotal_buffer[k + 1] - ptotal_buffer[k]) < detection_threshold && ((pavg_after - pavg_before) * (ptotal_buffer[3] - ptotal_buffer[1]) > 0.0)) {
+				if(fabs(ptotal_buffer[k + 1] - ptotal_buffer[k]) < (detection_threshold * 0.5) && fabs(pavg_after - pavg_before) > detection_threshold && ((pavg_after - pavg_before) * (ptotal_buffer[3] - ptotal_buffer[1]) > 0.0)) {
+					
 					new_load_event.timestamp = pd_buffer[1].timestamp;
 					new_load_event.duration = k - 1;
 					new_load_event.delta_pt = (pavg_after - pavg_before);
