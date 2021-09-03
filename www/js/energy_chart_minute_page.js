@@ -52,7 +52,7 @@ function initPage() {
 	});
 	
 	updateChart();
-	fetchApplianceList();
+	fetchApplianceNames();
 }
 
 function updateChart() {
@@ -68,7 +68,7 @@ function updateChart() {
 		window.smceeEnergyChart.resetZoom();
 	} else {
 		if(disaggregatedEnergyMode) {
-			window.smceeEnergyChart.setVisibility(new Array(window.smceeApplianceList.size + 1).fill(true));
+			window.smceeEnergyChart.setVisibility(new Array(window.smceeApplianceNames.size + 1).fill(true));
 			
 			window.smceeEnergyChart.updateOptions({
 				'stackedGraph' : document.getElementById("stacked-checkbox").checked
@@ -79,17 +79,17 @@ function updateChart() {
 	}
 }
 
-function fetchApplianceList() {
+function fetchApplianceNames() {
 	var xhrApplianceList = new XMLHttpRequest();
 	
 	xhrApplianceList.onload = function() {
 		if(this.status === 200) {
 			var responseObject = JSON.parse(this.responseText);
 			
-			window.smceeApplianceList = new Map();
+			window.smceeApplianceNames = new Map();
 			
 			for(const applianceItem of responseObject)
-				window.smceeApplianceList.set(applianceItem.id, applianceItem);
+				window.smceeApplianceNames.set(applianceItem.id, applianceItem.name);
 			
 			document.getElementById("disaggregation-checkbox").disabled = false;
 			
@@ -193,12 +193,12 @@ function fetchEnergyData(disaggregatedEnergy=false) {
 			window.smceeEnergyData.disaggregated = disaggregatedEnergy;
 			
 			if(disaggregatedEnergy) {
-				for(appliance of window.smceeApplianceList.values())
-					labels.push(appliance.name);
+				for(applianceName of window.smceeApplianceNames.values())
+					labels.push(applianceName);
 				
 				labels.push("Desconhecido");
 				
-				window.smceeEnergyData.data = generateDisaggregatedEnergyFile(window.smceeApplianceList.size, responseObj, startTimestamp, endTimestamp);
+				window.smceeEnergyData.data = generateDisaggregatedEnergyFile(window.smceeApplianceNames.size, responseObj, startTimestamp, endTimestamp);
 			} else {
 				labels.push("Energia", "Energia Reativa");
 				
@@ -212,12 +212,12 @@ function fetchEnergyData(disaggregatedEnergy=false) {
 			});
 			
 			if(disaggregatedEnergy)
-				window.smceeEnergyChart.setVisibility(new Array(window.smceeApplianceList.size + 1).fill(true));
+				window.smceeEnergyChart.setVisibility(new Array(window.smceeApplianceNames.size + 1).fill(true));
 			else
 				window.smceeEnergyChart.setVisibility([true, document.getElementById("reactive-checkbox").checked]);
 			
 			document.getElementById('date-input').disabled = false;
-			document.getElementById('disaggregation-checkbox').disabled = (typeof window.smceeApplianceList == "undefined");
+			document.getElementById('disaggregation-checkbox').disabled = (typeof window.smceeApplianceNames == "undefined");
 			document.getElementById("reactive-checkbox").disabled = disaggregatedEnergy;
 			document.getElementById("stacked-checkbox").disabled = !disaggregatedEnergy;
 			
