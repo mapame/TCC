@@ -78,6 +78,9 @@ function initPage() {
 				legend: {
 					display: true,
 					onClick: handleLegendClick,
+				},
+				tooltip: {
+					filter: (element => element.raw > 0),
 				}
 			}
 		}
