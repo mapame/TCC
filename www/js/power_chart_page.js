@@ -220,13 +220,14 @@ function updateAnnotations() {
 			annotation.text += "\nLacuna: " + eventItem.time_gap + " s";
 		
 		if(eventItem.state >= 3)
-			annotation.text += "\n\nAparelho: " + window.smceeApplianceList.get(eventItem.appliance_id).name + " (score: " + eventItem.pair_score + ")";
+			annotation.text += "\n\n" + window.smceeApplianceList.get(eventItem.pair_appliance_id).name + " (score: " + eventItem.pair_score + ")";
 		
 		if(eventItem.state >= 2) {
-			annotation.text += "\n\nDesv. Padrão: " + (eventItem.p_sd * 100).toFixed(1) + " %\n";
+			annotation.text += "\n\nOutlier Score: " + eventItem.outlier_score.toFixed(2) + "\n";
 			
-			for(let idx = 0; idx < 3 && eventItem.appliance_ids[idx] > 0; idx++)
-				annotation.text += "\n" + window.smceeApplianceList.get(eventItem.appliance_ids[idx]).name + ": " + (eventItem.appliance_probs[idx] * 100).toFixed(1) + " %";
+			annotation.text += "Possiveis aparelhos:";
+			for(let idx = 0; idx < 3 && eventItem.possible_appliances[idx] > 0; idx++)
+				annotation.text += "\n- " + window.smceeApplianceList.get(eventItem.possible_appliances[idx]).name;
 		
 		}
 		

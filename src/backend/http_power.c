@@ -211,9 +211,9 @@ unsigned int http_handler_get_load_events(struct MHD_Connection *conn,
 		json_object_object_add_ex(response_item, "duration", json_object_new_int(loadev_buffer[i].duration), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		json_object_object_add_ex(response_item, "delta_pt", json_object_new_double(loadev_buffer[i].delta_pt), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		json_object_object_add_ex(response_item, "peak_pt", json_object_new_double(loadev_buffer[i].peak_pt), JSON_C_OBJECT_ADD_KEY_IS_NEW);
-		json_object_object_add_ex(response_item, "p_sd",  json_object_new_double(loadev_buffer[i].p_sd), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(response_item, "outlier_score",  json_object_new_double(loadev_buffer[i].outlier_score), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		json_object_object_add_ex(response_item, "pair_timestamp",  json_object_new_int64(loadev_buffer[i].pair_timestamp), JSON_C_OBJECT_ADD_KEY_IS_NEW);
-		json_object_object_add_ex(response_item, "appliance_id",  json_object_new_int(loadev_buffer[i].appliance_id), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(response_item, "pair_appliance_id",  json_object_new_int(loadev_buffer[i].pair_appliance_id), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		json_object_object_add_ex(response_item, "pair_score",  json_object_new_int(loadev_buffer[i].pair_score), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		
 		appliance_array = json_object_new_array();
@@ -235,18 +235,11 @@ unsigned int http_handler_get_load_events(struct MHD_Connection *conn,
 		json_object_object_add_ex(response_item, "delta_q", appliance_array, JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		
 		appliance_array = json_object_new_array();
-		json_object_array_add(appliance_array, json_object_new_int(loadev_buffer[i].appliance_ids[0]));
-		json_object_array_add(appliance_array, json_object_new_int(loadev_buffer[i].appliance_ids[1]));
-		json_object_array_add(appliance_array, json_object_new_int(loadev_buffer[i].appliance_ids[2]));
+		json_object_array_add(appliance_array, json_object_new_int(loadev_buffer[i].possible_appliances[0]));
+		json_object_array_add(appliance_array, json_object_new_int(loadev_buffer[i].possible_appliances[1]));
+		json_object_array_add(appliance_array, json_object_new_int(loadev_buffer[i].possible_appliances[2]));
 		
-		json_object_object_add_ex(response_item, "appliance_ids", appliance_array, JSON_C_OBJECT_ADD_KEY_IS_NEW);
-		
-		appliance_array = json_object_new_array();
-		json_object_array_add(appliance_array, json_object_new_double(loadev_buffer[i].appliance_probs[0]));
-		json_object_array_add(appliance_array, json_object_new_double(loadev_buffer[i].appliance_probs[1]));
-		json_object_array_add(appliance_array, json_object_new_double(loadev_buffer[i].appliance_probs[2]));
-		
-		json_object_object_add_ex(response_item, "appliance_probs", appliance_array, JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(response_item, "possible_appliances", appliance_array, JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		
 		json_object_array_add(response_array, response_item);
 	}

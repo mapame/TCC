@@ -44,4 +44,4 @@ executable('tcc-data-export',
 executable('tcc-backend',
 			include_directories: 'src/common',
 			sources : [common_sources, backend_sources],
-			dependencies: [common_deps, dependency('threads'), dependency('libmicrohttpd'), dependency('json-c'), dependency('uuid'), dependency('sqlite3'), cc.find_library('svm')])
+			dependencies: [common_deps, dependency('threads'), dependency('libmicrohttpd'), dependency('json-c'), dependency('uuid'), dependency('sqlite3')])

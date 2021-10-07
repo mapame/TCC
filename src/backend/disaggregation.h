@@ -15,11 +15,10 @@ typedef struct load_event_s {
 	double delta_s[2];
 	double delta_q[2];
 	
-	double p_sd;
-	int appliance_ids[3];
-	double appliance_probs[3];
+	double outlier_score;
+	int possible_appliances[3];
 	
-	int appliance_id;
+	int pair_appliance_id;
 	time_t pair_timestamp;
 	int pair_score;
 	

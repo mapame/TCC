@@ -21,7 +21,7 @@
 #include "disaggregation.h"
 
 #define LOAD_EVENT_BUFFER_SIZE 10000
-#define DISAGGREGATION_BUFFER_SIZE 8
+#define DISAGGREGATION_BUFFER_SIZE 10
 #define MAX_TIME_GAP 4
 #define TRAINING_MIN_SIGNATURE_QTY 10
 
@@ -110,7 +110,7 @@ static int import_load_events_from_file(const char *filename, time_t timestamp_l
 			}
 			
 		} else if(strncmp(line_buffer, "PREDICTED,", 10) == 0) {
-			if(sscanf(line_buffer, "PREDICTED,%li,%lf,%i,%i,%i,%lf,%lf,%lf\n", &load_event.timestamp, &load_event.p_sd, &load_event.appliance_ids[0], &load_event.appliance_ids[1], &load_event.appliance_ids[2], &load_event.appliance_probs[0], &load_event.appliance_probs[1], &load_event.appliance_probs[2]) == 8) {
+			if(sscanf(line_buffer, "PREDICTED,%li,%lf,%i,%i,%i\n", &load_event.timestamp, &load_event.outlier_score, &load_event.possible_appliances[0], &load_event.possible_appliances[1], &load_event.possible_appliances[2]) == 5) {
 				load_event.state = 2;
 				
 				update_load_event(&load_event);
@@ -121,7 +121,7 @@ static int import_load_events_from_file(const char *filename, time_t timestamp_l
 			}
 			
 		} else if(strncmp(line_buffer, "PAIRED,", 7) == 0) {
-			if(sscanf(line_buffer, "PAIRED,%li,%i,%li,%i\n", &load_event.timestamp, &load_event.appliance_id, &load_event.pair_timestamp, &load_event.pair_score) == 4) {
+			if(sscanf(line_buffer, "PAIRED,%li,%i,%li,%i\n", &load_event.timestamp, &load_event.pair_appliance_id, &load_event.pair_timestamp, &load_event.pair_score) == 4) {
 				load_event.state = 3;
 				
 				update_load_event(&load_event);
@@ -223,16 +223,13 @@ static int update_load_event(const load_event_t *updated_load_event) {
 		
 		if(load_event->timestamp == updated_load_event->timestamp) {
 			if(updated_load_event->state == 2) {
-				load_event->p_sd = updated_load_event->p_sd;
-				load_event->appliance_ids[0] = updated_load_event->appliance_ids[0];
-				load_event->appliance_ids[1] = updated_load_event->appliance_ids[1];
-				load_event->appliance_ids[2] = updated_load_event->appliance_ids[2];
-				load_event->appliance_probs[0] = updated_load_event->appliance_probs[0];
-				load_event->appliance_probs[1] = updated_load_event->appliance_probs[1];
-				load_event->appliance_probs[2] = updated_load_event->appliance_probs[2];
+				load_event->outlier_score = updated_load_event->outlier_score;
+				load_event->possible_appliances[0] = updated_load_event->possible_appliances[0];
+				load_event->possible_appliances[1] = updated_load_event->possible_appliances[1];
+				load_event->possible_appliances[2] = updated_load_event->possible_appliances[2];
 			} else if(updated_load_event->state == 3) {
 				load_event->pair_timestamp = updated_load_event->pair_timestamp;
-				load_event->appliance_id = updated_load_event->appliance_id;
+				load_event->pair_appliance_id = updated_load_event->pair_appliance_id;
 				load_event->pair_score = updated_load_event->pair_score;
 			}
 			
@@ -345,7 +342,7 @@ static int predict_load_events(const model_t *model) {
 				return -2;
 			}
 			
-			if(open_le_fd == NULL || fprintf(open_le_fd, "PREDICTED,%li,%.4lf,%i,%i,%i,%.4lf,%.4lf,%.4lf\n", load_event->timestamp, load_event->p_sd, load_event->appliance_ids[0], load_event->appliance_ids[1], load_event->appliance_ids[2], load_event->appliance_probs[0], load_event->appliance_probs[1], load_event->appliance_probs[2]) < 0) {
+			if(open_le_fd == NULL || fprintf(open_le_fd, "PREDICTED,%li,%.4lf,%i,%i,%i\n", load_event->timestamp, load_event->outlier_score, load_event->possible_appliances[0], load_event->possible_appliances[1], load_event->possible_appliances[2]) < 0) {
 				LOG_ERROR("Failed to write load event prediction to file.");
 				
 				pthread_mutex_unlock(&load_event_mutex);
@@ -370,7 +367,7 @@ static int has_common_appliance_id(const load_event_t *le1, const load_event_t *
 	
 	for(i = 0; i < 3; i++)
 		for(j = 0; j < 3; j++)
-			if(le1->appliance_ids[i] == le2->appliance_ids[j])
+			if(le1->possible_appliances[i] != 0 && le1->possible_appliances[i] == le2->possible_appliances[j])
 				qty++;
 	
 	return qty;
@@ -378,33 +375,28 @@ static int has_common_appliance_id(const load_event_t *le1, const load_event_t *
 
 static int get_pair_score(int appliance_id, const load_event_t *load_event_off, const load_event_t *load_event_on) {
 	int score = 0;
-	int i, j, k;
+	int i, j;
 	
 	if(load_event_off == NULL || load_event_on == NULL || appliance_id <= 0)
 		return 0;
+	
+	if((load_event_off->timestamp - load_event_on->timestamp) > (12*3600))
+		score -= 5000;
 	
 	score -= load_event_off->time_gap * 1000;
 	score -= load_event_on->time_gap * 1000;
 	score -= 20000 * (fabs(load_event_on->delta_pt + load_event_off->delta_pt)/load_event_on->delta_pt);
 	
-	if(load_event_off->p_sd < 0.05)
-		score -= 5000;
-	
-	if(load_event_on->p_sd < 0.05)
-		score -= 5000;
-	
 	for(i = 0; i < 3; i++)
 		for(j = 0; j < 3; j++)
-			if(load_event_off->appliance_ids[i] == load_event_on->appliance_ids[j] && load_event_off->appliance_ids[i] == appliance_id) {
+			if(load_event_off->possible_appliances[i] == load_event_on->possible_appliances[j] && load_event_off->possible_appliances[i] == appliance_id) {
 				score += 10000;
 				
-				for(k = i; k < 2; k++)
-					if(load_event_off->appliance_ids[k] == 0)
-						score += 5000;
+				if(load_event_off->outlier_score <= 1.0)
+					score += 5000;
 				
-				for(k = j; k < 2; k++)
-					if(load_event_on->appliance_ids[k] == 0)
-						score += 5000;
+				if(load_event_on->outlier_score <= 1.0)
+					score += 5000;
 				
 				return score;
 			}
@@ -413,7 +405,7 @@ static int get_pair_score(int appliance_id, const load_event_t *load_event_off, 
 }
 
 static int pair_load_events() {
-	time_t timestamp_limit = time(NULL) - (3600 * 12);
+	time_t timestamp_limit = time(NULL) - (3600 * 24);
 	int count_off, pos_off;
 	int count_on, pos_on;
 	load_event_t *load_event_off = NULL;
@@ -475,7 +467,7 @@ static int pair_load_events() {
 			
 			for(appliance_idx = 0; appliance_idx < 3; appliance_idx++) {
 				
-				pair_score = get_pair_score(load_event_off->appliance_ids[appliance_idx], load_event_off, load_event_on);
+				pair_score = get_pair_score(load_event_off->possible_appliances[appliance_idx], load_event_off, load_event_on);
 				
 				pair_score -= score_penalty;
 				
@@ -483,7 +475,7 @@ static int pair_load_events() {
 				if(pair_score > best_pair_score) {
 					best_pair_score = pair_score;
 					best_pair_load_event = load_event_on;
-					best_pair_appliance_id = load_event_off->appliance_ids[appliance_idx];
+					best_pair_appliance_id = load_event_off->possible_appliances[appliance_idx];
 				}
 			}
 			
@@ -493,8 +485,8 @@ static int pair_load_events() {
 		if(best_pair_load_event) {
 			load_event_off->state = best_pair_load_event->state = 3;
 			
-			load_event_off->appliance_id = best_pair_appliance_id;
-			best_pair_load_event->appliance_id = best_pair_appliance_id;
+			load_event_off->pair_appliance_id = best_pair_appliance_id;
+			best_pair_load_event->pair_appliance_id = best_pair_appliance_id;
 			
 			load_event_off->pair_timestamp = best_pair_load_event->timestamp;
 			best_pair_load_event->pair_timestamp = load_event_off->timestamp;
@@ -577,13 +569,16 @@ void *disaggregation_loop(void *argp) {
 			signature_qty = fetch_signatures(&signatures, detection_threshold);
 			
 			if(signature_qty > TRAINING_MIN_SIGNATURE_QTY) {
-				LOG_INFO("Training model using appliance signatures.");
+				LOG_INFO("Training model using %i appliance signatures.", signature_qty);
 				new_model = train_model(signatures, signature_qty);
 				
 				free(signatures);
 				
 				if(new_model) {
+					LOG_INFO("Training completed.");
 					free_model_content(current_model);
+					free(current_model);
+					
 					current_model = new_model;
 				}
 			}
