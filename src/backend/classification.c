@@ -19,6 +19,7 @@
 #define K_VALUE_MIN 5
 #define K_VALUE_MAX 30
 #define CROSSV_FOLDS 10
+#define LOF_MINPTS 5
 
 typedef struct knn_s {
 	int dim;
@@ -354,9 +355,6 @@ static int knn_predict(const knn_t *model, const double *point, int kvalue, doub
 	int neighborhood_size;
 	int *neighborhood;
 	int neighborhood_array_size;
-	double rd_sum = 0;
-	double lrd_sum = 0;
-	double lrd;
 	int neighborhood_class_n;
 	int *neighborhood_labels;
 	int *neighborhood_counts;
@@ -386,8 +384,6 @@ static int knn_predict(const knn_t *model, const double *point, int kvalue, doub
 	
 	k_distance = tmp_distances[kvalue - 1];
 	
-	free(tmp_distances);
-	
 	neighborhood_size = 0;
 	neighborhood_array_size = kvalue;
 	neighborhood = (int*) malloc(neighborhood_array_size * sizeof(int));
@@ -406,20 +402,28 @@ static int knn_predict(const knn_t *model, const double *point, int kvalue, doub
 		}
 	
 	if(lof && model->k_distance && model->lrd && model->minpts > 0 && model->minpts <= n) {
+		double lof_k_distance;
+		double rd_sum = 0;
+		double lrd_sum = 0;
+		double lrd;
+		
+		lof_k_distance = tmp_distances[model->minpts - 1];
+		
 		for(int i = 0; i < n; i++)
-			if(distances[i] <= k_distance)
+			if(distances[i] <= lof_k_distance)
 				rd_sum += MAX(model->k_distance[i], distances[i]);
 		
 		lrd = ((double)neighborhood_size) / rd_sum;
 		
 		for(int i = 0; i < n; i++)
-			if(distances[i] <= k_distance)
+			if(distances[i] <= lof_k_distance)
 				lrd_sum += model->lrd[i];
 		
 		*lof = lrd_sum / (((double)neighborhood_size) * lrd);
 	}
 	
 	free(distances);
+	free(tmp_distances);
 	
 	neighborhood_class_n = count_classes(neighborhood, neighborhood_size, &neighborhood_labels, &neighborhood_counts);
 	
@@ -665,10 +669,10 @@ model_t *train_model(const load_signature_t *signatures, int signature_qty) {
 	
 	LOG_INFO("Best k values: ON %i (%.1lf %%) \\ OFF %i (%.1lf %%)", new_model->kvalue_on, rate_on * 100.0, new_model->kvalue_off, rate_off * 100.0);
 	
-	LOG_INFO("Calculating training set LOF values.");
+	LOG_INFO("Calculating training set LOF values with MinPts=%i.", LOF_MINPTS);
 	
-	knn_prepare_lof(&new_model->on, 3);
-	knn_prepare_lof(&new_model->off, 3);
+	knn_prepare_lof(&new_model->on, LOF_MINPTS);
+	knn_prepare_lof(&new_model->off, LOF_MINPTS);
 	
 	if(new_model->on.nr_classes != new_model->off.nr_classes) {
 		LOG_ERROR("ON and OFF models have different number of classes, aborting training.");
