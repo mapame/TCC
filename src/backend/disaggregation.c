@@ -246,7 +246,7 @@ static int update_load_event(const load_event_t *updated_load_event) {
 	return 0;
 }
 
-static time_t detect_load_events(time_t last_timestamp, double detection_threshold) {
+static time_t detect_load_events(time_t last_timestamp, double detection_threshold, double min_event_power) {
 	power_data_t pd_buffer[DISAGGREGATION_BUFFER_SIZE];
 	double ptotal_buffer[DISAGGREGATION_BUFFER_SIZE];
 	load_event_t new_load_event;
@@ -271,14 +271,14 @@ static time_t detect_load_events(time_t last_timestamp, double detection_thresho
 		if(time_gap > MAX_TIME_GAP)
 			continue;
 		
-		if(fabs(ptotal_buffer[1] - ptotal_buffer[0]) < (detection_threshold * 0.5) && fabs(ptotal_buffer[2] - ptotal_buffer[1]) > (detection_threshold * 0.5) && fabs(ptotal_buffer[3] - ptotal_buffer[1]) > detection_threshold) {
+		if(fabs(ptotal_buffer[1] - ptotal_buffer[0]) < detection_threshold && fabs(ptotal_buffer[2] - ptotal_buffer[1]) > detection_threshold && fabs(ptotal_buffer[3] - ptotal_buffer[1]) > detection_threshold) {
 			
 			pavg_before = (ptotal_buffer[0] + ptotal_buffer[1]) / 2.0;
 			
 			for(int k = 3; k < DISAGGREGATION_BUFFER_SIZE - 2; k++) {
 				pavg_after = (ptotal_buffer[k] + ptotal_buffer[k + 1]) / 2.0;
 				
-				if(fabs(ptotal_buffer[k + 1] - ptotal_buffer[k]) < (detection_threshold * 0.5) && fabs(pavg_after - pavg_before) > detection_threshold && ((pavg_after - pavg_before) * (ptotal_buffer[3] - ptotal_buffer[1]) > 0.0)) {
+				if(fabs(ptotal_buffer[k + 1] - ptotal_buffer[k]) < detection_threshold && fabs(pavg_after - pavg_before) > min_event_power) {
 					
 					new_load_event.timestamp = pd_buffer[1].timestamp;
 					new_load_event.duration = k - 1;
@@ -541,7 +541,7 @@ time_t get_last_detected_load_event_timestamp() {
 void *disaggregation_loop(void *argp) {
 	int *terminate = (int*) argp;
 	
-	double detection_threshold;
+	double detection_threshold, min_power;
 	time_t last_timestamp_detection = get_last_detected_load_event_timestamp();
 	
 	load_signature_t *signatures;
@@ -552,9 +552,10 @@ void *disaggregation_loop(void *argp) {
 	srand(time(NULL));
 	
 	while(!(*terminate)) {
-		detection_threshold = config_get_value_double("load_event_detection_threshold", 10, 100, 50);
+		detection_threshold = config_get_value_double("load_event_detection_threshold", 5, 50, 20);
+		min_power = config_get_value_double("load_event_min_power", 20, 100, 50);
 		
-		last_timestamp_detection = detect_load_events(last_timestamp_detection, detection_threshold);
+		last_timestamp_detection = detect_load_events(last_timestamp_detection, detection_threshold, min_power);
 		
 		if(config_get_value_int("perform_disaggregation", 0, 1, 0) == 0) {
 			sleep(2);
@@ -566,7 +567,7 @@ void *disaggregation_loop(void *argp) {
 		if(signature_last_modification > model_signature_last_modification && (time(NULL) - signature_last_modification) > 30) {
 			model_signature_last_modification = signature_last_modification;
 			
-			signature_qty = fetch_signatures(&signatures, detection_threshold);
+			signature_qty = fetch_signatures(&signatures, min_power);
 			
 			if(signature_qty > TRAINING_MIN_SIGNATURE_QTY) {
 				LOG_INFO("Training model using %i appliance signatures.", signature_qty);
