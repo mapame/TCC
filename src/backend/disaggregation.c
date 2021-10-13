@@ -392,11 +392,6 @@ static int get_pair_score(int appliance_id, const load_event_t *load_event_off, 
 			if(load_event_off->possible_appliances[i] == load_event_on->possible_appliances[j] && load_event_off->possible_appliances[i] == appliance_id) {
 				score += 10000;
 				
-				if(load_event_off->outlier_score <= 1.0)
-					score += 5000;
-				
-				if(load_event_on->outlier_score <= 1.0)
-					score += 5000;
 				
 				return score;
 			}
@@ -414,6 +409,11 @@ static int pair_load_events() {
 	load_event_t *load_event_on = NULL;
 	int pair_score, best_pair_score;
 	load_event_t *best_pair_load_event = NULL;
+	double classification_inliner_threshold, classification_outlier_threshold, classification_absolute_outlier_threshold;
+	
+	classification_inliner_threshold = config_get_value_double("classification_inliner_threshold", 0.5, 2, 1);
+	classification_outlier_threshold = config_get_value_double("classification_outlier_threshold", 1, 10, 1.5);
+	classification_absolute_outlier_threshold = config_get_value_double("classification_absolute_outlier_threshold", 5, 50, 20);
 	
 	pthread_mutex_lock(&load_event_mutex);
 	
@@ -427,7 +427,7 @@ static int pair_load_events() {
 		if(load_event_off->state != 2 || load_event_off->delta_pt >= 0.0)
 			continue;
 		
-		if(load_event_off->timestamp < timestamp_limit)
+		if(load_event_off->timestamp < timestamp_limit || load_event_off->outlier_score >= classification_absolute_outlier_threshold)
 			continue;
 		
 		score_penalty = 0;
@@ -451,7 +451,7 @@ static int pair_load_events() {
 			if(load_event_on->state != 2)
 				continue;
 			
-			if(has_common_appliance_id(load_event_off, load_event_on) == 0)
+			if(has_common_appliance_id(load_event_off, load_event_on) == 0 || load_event_on->outlier_score >= classification_absolute_outlier_threshold)
 				continue;
 			
 			// Se encontrar outro evento de desligamento com ID em comum, aumenta a penalidade e pula pro próximo
@@ -468,6 +468,16 @@ static int pair_load_events() {
 			for(appliance_idx = 0; appliance_idx < 3; appliance_idx++) {
 				
 				pair_score = get_pair_score(load_event_off->possible_appliances[appliance_idx], load_event_off, load_event_on);
+				
+				if(load_event_off->outlier_score <= classification_inliner_threshold)
+					pair_score += 1000;
+				else if(load_event_off->outlier_score >= classification_outlier_threshold)
+					pair_score -= 1000;
+				
+				if(load_event_on->outlier_score <= classification_inliner_threshold)
+					pair_score += 1000;
+				else if(load_event_on->outlier_score >= classification_outlier_threshold)
+					pair_score -= 1000;
 				
 				pair_score -= score_penalty;
 				
