@@ -9,6 +9,7 @@ typedef struct load_event_s {
 	
 	int time_gap;
 	int duration;
+	double raw_delta_pt;
 	double delta_pt;
 	double peak_pt;
 	double delta_p[2];

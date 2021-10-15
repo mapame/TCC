@@ -209,6 +209,7 @@ unsigned int http_handler_get_load_events(struct MHD_Connection *conn,
 		json_object_object_add_ex(response_item, "state", json_object_new_int64(loadev_buffer[i].state), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		json_object_object_add_ex(response_item, "time_gap", json_object_new_int(loadev_buffer[i].time_gap), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		json_object_object_add_ex(response_item, "duration", json_object_new_int(loadev_buffer[i].duration), JSON_C_OBJECT_ADD_KEY_IS_NEW);
+		json_object_object_add_ex(response_item, "raw_delta_pt", json_object_new_double(loadev_buffer[i].raw_delta_pt), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		json_object_object_add_ex(response_item, "delta_pt", json_object_new_double(loadev_buffer[i].delta_pt), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		json_object_object_add_ex(response_item, "peak_pt", json_object_new_double(loadev_buffer[i].peak_pt), JSON_C_OBJECT_ADD_KEY_IS_NEW);
 		json_object_object_add_ex(response_item, "outlier_score",  json_object_new_double(loadev_buffer[i].outlier_score), JSON_C_OBJECT_ADD_KEY_IS_NEW);

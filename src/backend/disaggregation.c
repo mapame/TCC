@@ -22,6 +22,7 @@
 
 #define LOAD_EVENT_BUFFER_SIZE 10000
 #define DISAGGREGATION_BUFFER_SIZE 10
+#define POWER_NORMALIZATION_EXPOENT 2
 #define MAX_TIME_GAP 4
 #define TRAINING_MIN_SIGNATURE_QTY 10
 
@@ -98,7 +99,7 @@ static int import_load_events_from_file(const char *filename, time_t timestamp_l
 		line_counter++;
 		
 		if(strncmp(line_buffer, "DETECTED,", 9) == 0) {
-			if(sscanf(line_buffer, "DETECTED,%li,%i,%i,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf", &load_event.timestamp, &load_event.time_gap, &load_event.duration, &load_event.delta_pt, &load_event.peak_pt, &load_event.delta_p[0], &load_event.delta_p[1], &load_event.delta_s[0], &load_event.delta_s[1], &load_event.delta_q[0], &load_event.delta_q[1]) == 11) {
+			if(sscanf(line_buffer, "DETECTED,%li,%i,%i,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf", &load_event.timestamp, &load_event.time_gap, &load_event.duration, &load_event.raw_delta_pt, &load_event.delta_pt, &load_event.peak_pt, &load_event.delta_p[0], &load_event.delta_p[1], &load_event.delta_s[0], &load_event.delta_s[1], &load_event.delta_q[0], &load_event.delta_q[1]) == 11) {
 				load_event.state = 1;
 				
 				if(load_event.timestamp > timestamp_limit) {
@@ -185,7 +186,7 @@ static int add_load_event(const load_event_t *load_event, int save_to_file) {
 			return -2;
 		}
 		
-		if(fprintf(open_le_fd, "DETECTED,%li,%i,%i,%.4lf,%.4lf,%.4lf,%.4lf,%.4lf,%.4lf,%.4lf,%.4lf\n", load_event->timestamp, load_event->time_gap, load_event->duration, load_event->delta_pt, load_event->peak_pt, load_event->delta_p[0], load_event->delta_p[1], load_event->delta_s[0], load_event->delta_s[1], load_event->delta_q[0], load_event->delta_q[1]) < 0) {
+		if(fprintf(open_le_fd, "DETECTED,%li,%i,%i,%.4lf,%.4lf,%.4lf,%.4lf,%.4lf,%.4lf,%.4lf,%.4lf,%.4lf\n", load_event->timestamp, load_event->time_gap, load_event->duration, load_event->raw_delta_pt, load_event->delta_pt, load_event->peak_pt, load_event->delta_p[0], load_event->delta_p[1], load_event->delta_s[0], load_event->delta_s[1], load_event->delta_q[0], load_event->delta_q[1]) < 0) {
 			LOG_ERROR("Failed to write new load event to file.");
 			
 			pthread_mutex_unlock(&load_event_mutex);
@@ -246,9 +247,10 @@ static int update_load_event(const load_event_t *updated_load_event) {
 	return 0;
 }
 
-static time_t detect_load_events(time_t last_timestamp, double detection_threshold, double min_event_power) {
+static time_t detect_load_events(time_t last_timestamp, double nominal_line_voltage, double detection_threshold, double min_event_power) {
 	power_data_t pd_buffer[DISAGGREGATION_BUFFER_SIZE];
 	double ptotal_buffer[DISAGGREGATION_BUFFER_SIZE];
+	double raw_ptotal_buffer[DISAGGREGATION_BUFFER_SIZE];
 	load_event_t new_load_event;
 	int time_gap;
 	double pavg_before, pavg_after;
@@ -264,6 +266,15 @@ static time_t detect_load_events(time_t last_timestamp, double detection_thresho
 		for(int i = 0; i < DISAGGREGATION_BUFFER_SIZE; i++) {
 			if(i != 0)
 				time_gap += (pd_buffer[i].timestamp - pd_buffer[i - 1].timestamp) - 1;
+			
+			raw_ptotal_buffer[i] = pd_buffer[i].p[0] + pd_buffer[i].p[1];
+			
+			pd_buffer[i].p[0] = pd_buffer[i].p[0] * pow((nominal_line_voltage / pd_buffer[i].v[0]), POWER_NORMALIZATION_EXPOENT);
+			pd_buffer[i].p[1] = pd_buffer[i].p[1] * pow((nominal_line_voltage / pd_buffer[i].v[1]), POWER_NORMALIZATION_EXPOENT);
+			pd_buffer[i].q[0] = pd_buffer[i].q[0] * pow((nominal_line_voltage / pd_buffer[i].v[0]), POWER_NORMALIZATION_EXPOENT);
+			pd_buffer[i].q[1] = pd_buffer[i].q[1] * pow((nominal_line_voltage / pd_buffer[i].v[1]), POWER_NORMALIZATION_EXPOENT);
+			pd_buffer[i].s[0] = pd_buffer[i].s[0] * pow((nominal_line_voltage / pd_buffer[i].v[0]), POWER_NORMALIZATION_EXPOENT);
+			pd_buffer[i].s[1] = pd_buffer[i].s[1] * pow((nominal_line_voltage / pd_buffer[i].v[1]), POWER_NORMALIZATION_EXPOENT);
 			
 			ptotal_buffer[i] = pd_buffer[i].p[0] + pd_buffer[i].p[1];
 		}
@@ -282,6 +293,9 @@ static time_t detect_load_events(time_t last_timestamp, double detection_thresho
 					
 					new_load_event.timestamp = pd_buffer[1].timestamp;
 					new_load_event.duration = k - 1;
+					
+					new_load_event.raw_delta_pt = ((raw_ptotal_buffer[k] + raw_ptotal_buffer[k + 1]) / 2.0) - ((raw_ptotal_buffer[0] + raw_ptotal_buffer[1]) / 2.0);
+					
 					new_load_event.delta_pt = (pavg_after - pavg_before);
 					new_load_event.delta_p[0] = ((pd_buffer[k].p[0] + pd_buffer[k + 1].p[0]) / 2.0) - ((pd_buffer[0].p[0] + pd_buffer[1].p[0]) / 2.0);
 					new_load_event.delta_p[1] = ((pd_buffer[k].p[1] + pd_buffer[k + 1].p[1]) / 2.0) - ((pd_buffer[0].p[1] + pd_buffer[1].p[1]) / 2.0);
@@ -519,7 +533,7 @@ static int pair_load_events() {
 			
 			fflush(open_le_fd);
 			
-			energy_add_power_disaggregated(best_pair_appliance_id, best_pair_load_event->timestamp, load_event_off->timestamp, best_pair_load_event->delta_pt, fabs(load_event_off->delta_pt));
+			energy_add_power_disaggregated(best_pair_appliance_id, best_pair_load_event->timestamp, load_event_off->timestamp, best_pair_load_event->raw_delta_pt, fabs(load_event_off->raw_delta_pt));
 		}
 	}
 	
@@ -551,6 +565,7 @@ time_t get_last_detected_load_event_timestamp() {
 void *disaggregation_loop(void *argp) {
 	int *terminate = (int*) argp;
 	
+	double nominal_line_voltage;
 	double detection_threshold, min_power;
 	time_t last_timestamp_detection = get_last_detected_load_event_timestamp();
 	
@@ -562,10 +577,12 @@ void *disaggregation_loop(void *argp) {
 	srand(time(NULL));
 	
 	while(!(*terminate)) {
+		nominal_line_voltage = config_get_value_double("nominal_line_voltage", 110, 230, 127);
+		
 		detection_threshold = config_get_value_double("load_event_detection_threshold", 5, 50, 20);
 		min_power = config_get_value_double("load_event_min_power", 20, 100, 50);
 		
-		last_timestamp_detection = detect_load_events(last_timestamp_detection, detection_threshold, min_power);
+		last_timestamp_detection = detect_load_events(last_timestamp_detection, nominal_line_voltage, detection_threshold, min_power);
 		
 		if(config_get_value_int("perform_disaggregation", 0, 1, 0) == 0) {
 			sleep(2);
