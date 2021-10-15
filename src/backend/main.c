@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <string.h>
 #include <unistd.h>
 #include <stdint.h>
@@ -27,13 +28,14 @@ int main(int argc, char **argv) {
 	int http_port = DEFAULT_HTTP_PORT;
 	char *log_level_name = NULL;
 	char *working_dir_path = NULL;
+	time_t offline_timestamp = 0;
 	
 	pthread_t data_acquisition_thread;
 	pthread_t disaggregation_thread;
 	
 	struct MHD_Daemon *httpd;
 	
-	while((opt = getopt(argc, argv, "l:p:w:")) != -1) {
+	while((opt = getopt(argc, argv, "l:p:w:t:")) != -1) {
 		switch (opt) {
 			case 'l':
 				log_level_name = strdup(optarg);
@@ -44,12 +46,16 @@ int main(int argc, char **argv) {
 			case 'w':
 				working_dir_path = strdup(optarg);
 				break;
+			case 't':
+				sscanf(optarg, "%li", &offline_timestamp);
+				break;
 			default:
-				fprintf(stderr, "Usage: %s [options] -k key\n", argv[0]);
+				fprintf(stderr, "Usage: %s [options]\n", argv[0]);
 				fprintf(stderr, "Valid options:\n");
 				fprintf(stderr, "\t-l Logging level\n");
 				fprintf(stderr, "\t-p HTTP port number\n");
 				fprintf(stderr, "\t-w Working directory path\n");
+				fprintf(stderr, "\t-t Date as unix epoch (offline mode)\n");
 				exit(EXIT_FAILURE);
 		}
 	}
@@ -66,6 +72,11 @@ int main(int argc, char **argv) {
 	
 	if(http_port == 0) {
 		LOG_FATAL("Invalid HTTP port number.");
+		exit(EXIT_FAILURE);
+	}
+	
+	if(offline_timestamp < 0) {
+		LOG_FATAL("Invalid date.");
 		exit(EXIT_FAILURE);
 	}
 	
@@ -92,14 +103,22 @@ int main(int argc, char **argv) {
 	 * criadas a partir de agora vão herdar esse bloqueio. */
 	pthread_sigmask(SIG_BLOCK, &signal_set, NULL);
 	
-	load_saved_power_data();
-	load_saved_load_events();
+	load_saved_power_data(offline_timestamp);
 	
-	LOG_INFO("Starting data acquisition thread.");
-	pthread_create(&data_acquisition_thread, NULL, data_acquisition_loop, (void*) &terminate);
-	
-	LOG_INFO("Starting disaggregation thread.");
-	pthread_create(&disaggregation_thread, NULL, disaggregation_loop, (void*) &terminate);
+	if(offline_timestamp == 0) {
+		load_saved_load_events();
+		
+		LOG_INFO("Starting data acquisition thread.");
+		pthread_create(&data_acquisition_thread, NULL, data_acquisition_loop, (void*) &terminate);
+		
+		LOG_INFO("Starting disaggregation thread.");
+		pthread_create(&disaggregation_thread, NULL, disaggregation_loop, (void*) &terminate);
+	} else {
+		LOG_INFO("Running in offline mode with unix epoch %li.", offline_timestamp);
+		
+		LOG_INFO("Detecting load events.");
+		detect_all_load_events();
+	}
 	
 	LOG_INFO("Starting HTTP server.");
 	httpd = http_init(http_port);
@@ -111,10 +130,12 @@ int main(int argc, char **argv) {
 	
 	http_stop(httpd);
 	
-	LOG_INFO("Waiting for threads to terminate.");
-	
-	pthread_join(data_acquisition_thread, NULL);
-	pthread_join(disaggregation_thread, NULL);
+	if(offline_timestamp == 0) {
+		LOG_INFO("Waiting for threads to terminate.");
+		
+		pthread_join(data_acquisition_thread, NULL);
+		pthread_join(disaggregation_thread, NULL);
+	}
 	
 	close_power_data_file();
 	

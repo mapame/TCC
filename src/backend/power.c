@@ -48,8 +48,11 @@ static int import_power_data_file(const char *filename, time_t timestamp_limit) 
 		if(sscanf(line_buffer, "%li,%lf,%lf,%lf,%lf,%lf,%lf\n", &pd_aux.timestamp, &pd_aux.v[0], &pd_aux.v[1], &pd_aux.i[0], &pd_aux.i[1], &pd_aux.p[0], &pd_aux.p[1]) != 7)
 			continue;
 		
-		if(pd_aux.timestamp < timestamp_limit)
+		if(timestamp_limit > 0 && pd_aux.timestamp < timestamp_limit - (24 * 60 * 60))
 			continue;
+		
+		if(timestamp_limit > 0 && pd_aux.timestamp > timestamp_limit)
+			break;
 		
 		/* Não carrega valores fora de ordem */
 		if(pd_aux.timestamp <= last_loaded_timestamp)
@@ -79,23 +82,21 @@ static int import_power_data_file(const char *filename, time_t timestamp_limit) 
 	return counter;
 }
 
-int load_saved_power_data() {
-	time_t time_epoch;
+int load_saved_power_data(time_t timestamp) {
 	char filename_today[32];
 	char filename_yesterday[32];
 	int result;
 	
-	time_epoch = time(NULL);
-	generate_pd_filename(time_epoch, filename_today, sizeof(filename_today));
+	if(timestamp <= 0)
+		timestamp = time(NULL);
 	
-	/* Subtrai os segundos equivalentes a 24 horas para obter o dia de ontem */
-	time_epoch -= (24 * 60 * 60);
-	generate_pd_filename(time_epoch, filename_yesterday, sizeof(filename_yesterday));
+	generate_pd_filename(timestamp, filename_today, sizeof(filename_today));
+	generate_pd_filename(timestamp - (24 * 60 * 60), filename_yesterday, sizeof(filename_yesterday));
 	
-	if(access(filename_yesterday, F_OK) == 0) {
+	if(access(filename_yesterday, R_OK) == 0) {
 		LOG_INFO("Loading power data from yesterday's file \"%s\".", filename_yesterday);
 		
-		result = import_power_data_file(filename_yesterday, time_epoch);
+		result = import_power_data_file(filename_yesterday, timestamp);
 		if(result < 0) {
 			LOG_ERROR("Failed to load power data from yesterday's file.");
 			
@@ -105,10 +106,10 @@ int load_saved_power_data() {
 		LOG_INFO("Loaded %d entries from yesterday's file.", result);
 	}
 	
-	if(access(filename_today, F_OK) == 0) {
+	if(access(filename_today, R_OK) == 0) {
 		LOG_INFO("Loading power data from today's file \"%s\".", filename_today);
 		
-		result = import_power_data_file(filename_today, 0);
+		result = import_power_data_file(filename_today, timestamp);
 		if(result < 0) {
 			LOG_ERROR("Failed to load power data from today's file.");
 			

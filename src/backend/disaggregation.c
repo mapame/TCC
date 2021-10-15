@@ -328,6 +328,23 @@ static time_t detect_load_events(time_t last_timestamp, double nominal_line_volt
 	return last_timestamp;
 }
 
+void detect_all_load_events() {
+	double nominal_line_voltage;
+	double detection_threshold, min_power;
+	time_t detection_timestamp, last_timestamp_detection = 0;
+	
+	nominal_line_voltage = config_get_value_double("nominal_line_voltage", 110, 230, 127);
+	
+	detection_threshold = config_get_value_double("load_event_detection_threshold", 5, 50, 20);
+	min_power = config_get_value_double("load_event_min_power", 20, 100, 50);
+	
+	do {
+		detection_timestamp = last_timestamp_detection;
+		
+		last_timestamp_detection = detect_load_events(detection_timestamp, nominal_line_voltage, detection_threshold, min_power);
+	} while(detection_timestamp != last_timestamp_detection);
+}
+
 static int predict_load_events(const model_t *model) {
 	int pos;
 	load_event_t *load_event;

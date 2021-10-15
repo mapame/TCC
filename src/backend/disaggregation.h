@@ -26,6 +26,7 @@ typedef struct load_event_s {
 } load_event_t;
 
 int load_saved_load_events();
+void detect_all_load_events();
 int get_load_events(time_t timestamp_start, time_t timestamp_end, load_event_t *buffer, int buffer_len);
 
 #endif
