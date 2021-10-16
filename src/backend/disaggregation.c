@@ -143,22 +143,22 @@ static int import_load_events_from_file(const char *filename, time_t timestamp_l
 }
 
 int load_saved_load_events() {
-	time_t timestamp_now = time(NULL);
+	time_t last_power_timestamp = power_get_last_timestamp();
 	char filename[32];
 	
-	generate_le_filename(timestamp_now - (24 * 3600), filename, sizeof(filename));
+	generate_le_filename(last_power_timestamp - (24 * 3600), filename, sizeof(filename));
 	
 	if(access(filename, F_OK) == 0) {
 		LOG_INFO("Importing yesterday's load events from file \"%s\".", filename);
 		
-		if(import_load_events_from_file(filename, timestamp_now - (24 * 3600)) < 0) {
+		if(import_load_events_from_file(filename, last_power_timestamp - (24 * 3600)) < 0) {
 			LOG_ERROR("Failed to import load events from file.");
 			
 			return -1;
 		}
 	}
 	
-	generate_le_filename(timestamp_now, filename, sizeof(filename));
+	generate_le_filename(last_power_timestamp, filename, sizeof(filename));
 	
 	if(access(filename, F_OK) == 0) {
 		LOG_INFO("Importing today's load events from file \"%s\".", filename);
