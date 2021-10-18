@@ -247,7 +247,7 @@ static int update_load_event(const load_event_t *updated_load_event) {
 	return 0;
 }
 
-static time_t detect_load_events(time_t last_timestamp, double nominal_line_voltage, double detection_threshold, double min_event_power) {
+static time_t detect_load_events(time_t last_timestamp, double nominal_line_voltage, double detection_threshold, double min_event_power, int save_to_file) {
 	power_data_t pd_buffer[DISAGGREGATION_BUFFER_SIZE];
 	double ptotal_buffer[DISAGGREGATION_BUFFER_SIZE];
 	double raw_ptotal_buffer[DISAGGREGATION_BUFFER_SIZE];
@@ -315,7 +315,7 @@ static time_t detect_load_events(time_t last_timestamp, double nominal_line_volt
 					
 					new_load_event.state = 1;
 					
-					add_load_event(&new_load_event, 1);
+					add_load_event(&new_load_event, save_to_file);
 					
 					last_timestamp = pd_buffer[k].timestamp;
 					
@@ -341,7 +341,7 @@ void detect_all_load_events() {
 	do {
 		detection_timestamp = last_timestamp_detection;
 		
-		last_timestamp_detection = detect_load_events(detection_timestamp, nominal_line_voltage, detection_threshold, min_power);
+		last_timestamp_detection = detect_load_events(detection_timestamp, nominal_line_voltage, detection_threshold, min_power, 0);
 	} while(detection_timestamp != last_timestamp_detection);
 }
 
@@ -599,7 +599,7 @@ void *disaggregation_loop(void *argp) {
 		detection_threshold = config_get_value_double("load_event_detection_threshold", 5, 50, 20);
 		min_power = config_get_value_double("load_event_min_power", 20, 100, 50);
 		
-		last_timestamp_detection = detect_load_events(last_timestamp_detection, nominal_line_voltage, detection_threshold, min_power);
+		last_timestamp_detection = detect_load_events(last_timestamp_detection, nominal_line_voltage, detection_threshold, min_power, 1);
 		
 		if(config_get_value_int("perform_disaggregation", 0, 1, 0) == 0) {
 			sleep(2);
