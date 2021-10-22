@@ -99,7 +99,7 @@ static int import_load_events_from_file(const char *filename, time_t timestamp_l
 		line_counter++;
 		
 		if(strncmp(line_buffer, "DETECTED,", 9) == 0) {
-			if(sscanf(line_buffer, "DETECTED,%li,%i,%i,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf", &load_event.timestamp, &load_event.time_gap, &load_event.duration, &load_event.raw_delta_pt, &load_event.delta_pt, &load_event.peak_pt, &load_event.delta_p[0], &load_event.delta_p[1], &load_event.delta_s[0], &load_event.delta_s[1], &load_event.delta_q[0], &load_event.delta_q[1]) == 11) {
+			if(sscanf(line_buffer, "DETECTED,%li,%i,%i,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf", &load_event.timestamp, &load_event.time_gap, &load_event.duration, &load_event.raw_delta_pt, &load_event.delta_pt, &load_event.peak_pt, &load_event.delta_p[0], &load_event.delta_p[1], &load_event.delta_s[0], &load_event.delta_s[1], &load_event.delta_q[0], &load_event.delta_q[1]) == 12) {
 				load_event.state = 1;
 				
 				if(load_event.timestamp > timestamp_limit) {
