@@ -15,5 +15,6 @@ typedef struct load_signature_s {
 
 int fetch_signatures(load_signature_t **sig_buffer_ptr, double min_power);
 time_t get_last_signature_modification();
+int get_appliances_max_time_on(int **result_output);
 
 #endif

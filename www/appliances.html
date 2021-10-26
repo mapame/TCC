@@ -51,7 +51,7 @@
 					<tr>
 						<th></th>
 						<th class="has-text-centered">Nome</th>
-						<th class="has-text-centered is-hidden-mobile">Potência</th>
+						<th class="has-text-centered is-hidden-mobile">Tempo Máximo</th>
 						<th class="has-text-centered is-hidden-mobile">Fixo</th>
 						<th class="has-text-centered is-hidden-mobile">Assinaturas</th>
 						<th class="has-text-centered is-hidden-mobile">Criação</th>
@@ -86,9 +86,27 @@
 					</div>
 				</div>
 				<div class="field">
-					<label class="label">Potência</label>
+					<label class="label">Tempo máximo ligado</label>
 					<div class="control">
-						<input class="input" id="input-appliance-power" type="number" placeholder="">
+						<div class="select">
+							<select id="input-appliance-max-time-on">
+								<option value="0" selected>Não especificado</option>
+								<option value="15">15 minutos</option>
+								<option value="30">30 minutos</option>
+								<option value="60">1 hora</option>
+								<option value="120">2 horas</option>
+								<option value="180">3 horas</option>
+								<option value="240">4 horas</option>
+								<option value="300">5 horas</option>
+								<option value="360">6 horas</option>
+								<option value="420">7 horas</option>
+								<option value="480">8 horas</option>
+								<option value="540">9 horas</option>
+								<option value="600">10 horas</option>
+								<option value="660">11 horas</option>
+								<option value="720">12 horas</option>
+							</select>
+						</div>
 					</div>
 				</div>
 				<div class="field">

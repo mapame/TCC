@@ -18,7 +18,7 @@ function openAddApplianceModal() {
 	
 	document.getElementById("input-appliance-name").value = "";
 	document.getElementById("input-appliance-is-active").checked = false;
-	document.getElementById("input-appliance-power").value = "";
+	document.getElementById("input-appliance-max-time-on").value = "0";
 	document.getElementById("input-appliance-is-hardwired").checked = false;
 	
 	document.getElementById("button-submit-appliance").onclick = submitNewAppliance;
@@ -33,7 +33,7 @@ function openEditApplianceModal(applianceId) {
 	
 	document.getElementById("input-appliance-name").value = applianceItem.name;
 	document.getElementById("input-appliance-is-active").checked = applianceItem.is_active;
-	document.getElementById("input-appliance-power").valueAsNumber = applianceItem.power;
+	document.getElementById("input-appliance-max-time-on").value = applianceItem.max_time_on;
 	document.getElementById("input-appliance-is-hardwired").checked = applianceItem.is_hardwired;
 	
 	document.getElementById("button-submit-appliance").onclick = submitUpdateAppliance.bind(null, applianceId);
@@ -88,7 +88,7 @@ function applianceTableAddItem(item) {
 	
 	tableCellID.innerText = item.id;
 	tableCellName.innerText = item.name;
-	tableCellPower.innerText = Math.round(item.power) + " W";
+	tableCellPower.innerText = (item.max_time_on < 60) ? (item.max_time_on + " m") : (Math.round(item.max_time_on / 60) + " h");
 	tableCellIsHardwired.innerHTML = item.is_hardwired ? "Sim" : "Não";
 	tableCellSigQty.innerText = item.signature_qty;
 	tableCellDateCreation.innerText = new Date(item.creation_date * 1000).toLocaleString("pt-BR");
@@ -146,19 +146,12 @@ function fetchApplianceList() {
 function validateApplianceForm() {
 	var fieldName = document.getElementById("input-appliance-name");
 	var fieldIsActive = document.getElementById("input-appliance-is-active");
-	var fieldPower = document.getElementById("input-appliance-power");
 	var fieldIsHardwired = document.getElementById("input-appliance-is-hardwired");
 	
 	fieldName.classList.remove("is-danger");
-	fieldPower.classList.remove("is-danger");
 	
 	if(fieldName.value.length < 3 || fieldName.value.length > 32) {
 		fieldName.classList.add("is-danger");
-		return false;
-	}
-	
-	if(isNaN(fieldPower.valueAsNumber) || fieldPower.valueAsNumber < 1) {
-		fieldPower.classList.add("is-danger");
 		return false;
 	}
 	
@@ -175,7 +168,7 @@ function submitNewAppliance() {
 	newAppliance = {
 			"name": document.getElementById("input-appliance-name").value,
 			"is_active": document.getElementById("input-appliance-is-active").checked,
-			"power": document.getElementById("input-appliance-power").valueAsNumber,
+			"max_time_on": Number(document.getElementById("input-appliance-max-time-on").value),
 			"is_hardwired": document.getElementById("input-appliance-is-hardwired").checked
 	};
 	
@@ -229,7 +222,7 @@ function submitUpdateAppliance(applianceID) {
 	updatedAppliance = {
 			"name": document.getElementById("input-appliance-name").value,
 			"is_active": document.getElementById("input-appliance-is-active").checked,
-			"power": document.getElementById("input-appliance-power").valueAsNumber,
+			"max_time_on": Number(document.getElementById("input-appliance-max-time-on").value),
 			"is_hardwired": document.getElementById("input-appliance-is-hardwired").checked
 	};
 	

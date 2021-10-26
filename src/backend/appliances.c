@@ -163,3 +163,71 @@ time_t get_last_signature_modification() {
 	
 	return last_modification_time;
 }
+
+int get_appliances_max_time_on(int **result_output) {
+	int result;
+	sqlite3 *db_conn = NULL;
+	sqlite3_stmt *ppstmt = NULL;
+	const char sql_get_max_time_on[] = "SELECT id,max_time_on FROM appliances ORDER BY id DESC;";
+	int last_appliance_id = 0;
+	int buffer_size = 16;
+	
+	if(!result_output)
+		return -1;
+	
+	if((result = sqlite3_open(DB_FILENAME, &db_conn)) != SQLITE_OK) {
+		LOG_ERROR("Failed to open database connection: %s", sqlite3_errstr(result));
+		sqlite3_close(db_conn);
+		
+		return -2;
+	}
+
+	sqlite3_busy_timeout(db_conn, 1000);
+
+	if((result = sqlite3_prepare_v2(db_conn, sql_get_max_time_on, -1, &ppstmt, NULL)) != SQLITE_OK) {
+		LOG_ERROR("Failed to prepare SQL statement: %s", sqlite3_errstr(result));
+		sqlite3_close(db_conn);
+		
+		return -2;
+	}
+	
+	*result_output = (int*) malloc(buffer_size * sizeof(int));
+	
+	while((result = sqlite3_step(ppstmt)) == SQLITE_ROW) {
+		int appliance_id = sqlite3_column_int(ppstmt, 0);
+		
+		if(appliance_id >= buffer_size) {
+			int *new_buffer;
+			
+			buffer_size = appliance_id + 1;
+			
+			new_buffer = (int*) realloc(*result_output, buffer_size * sizeof(int));
+			
+			if(!new_buffer) {
+				free(*result_output);
+				sqlite3_finalize(ppstmt);
+				sqlite3_close(db_conn);
+				
+				return -3;
+			}
+			
+			*result_output = new_buffer;
+		}
+		
+		(*result_output)[appliance_id] = sqlite3_column_int(ppstmt, 1);
+		
+		if(appliance_id > last_appliance_id)
+			last_appliance_id = appliance_id;
+	}
+	
+	sqlite3_finalize(ppstmt);
+	sqlite3_close(db_conn);
+	
+	if(result != SQLITE_DONE) {
+		LOG_ERROR("Failed to read appliances max_time_on from database: %s", sqlite3_errstr(result));
+		
+		return -2;
+	}
+	
+	return last_appliance_id;
+}
