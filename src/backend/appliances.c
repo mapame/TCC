@@ -231,3 +231,57 @@ int get_appliances_max_time_on(int **result_output) {
 	
 	return last_appliance_id;
 }
+
+double get_closest_signature_power(int appliance_id, double power) {
+	double closest = 0;
+	int result;
+	sqlite3 *db_conn = NULL;
+	sqlite3_stmt *ppstmt = NULL;
+	const char sql_get_closest_signature[] = "SELECT delta_pt FROM signatures WHERE appliance_id = ?1 AND ?2 * delta_pt > 0 ORDER BY ABS(delta_pt - ?2) LIMIT 1;";
+	
+	if(appliance_id <= 0)
+		return -1;
+	
+	if((result = sqlite3_open(DB_FILENAME, &db_conn)) != SQLITE_OK) {
+		LOG_ERROR("Failed to open database connection: %s", sqlite3_errstr(result));
+		sqlite3_close(db_conn);
+		
+		return -2;
+	}
+
+	sqlite3_busy_timeout(db_conn, 1000);
+
+	if((result = sqlite3_prepare_v2(db_conn, sql_get_closest_signature, -1, &ppstmt, NULL)) != SQLITE_OK) {
+		LOG_ERROR("Failed to prepare SQL statement: %s", sqlite3_errstr(result));
+		sqlite3_close(db_conn);
+		
+		return -2;
+	}
+
+	if(sqlite3_bind_int(ppstmt, 1, appliance_id) != SQLITE_OK || sqlite3_bind_double(ppstmt, 2, power) != SQLITE_OK) {
+		LOG_ERROR("Failed to bind value to prepared statement.");
+		sqlite3_finalize(ppstmt);
+		sqlite3_close(db_conn);
+		
+		return -2;
+	}
+
+	result = sqlite3_step(ppstmt);
+
+	if(result == SQLITE_ROW) {
+		closest = sqlite3_column_double(ppstmt, 0);
+		
+		result = sqlite3_step(ppstmt);
+	}
+
+	sqlite3_finalize(ppstmt);
+	sqlite3_close(db_conn);
+
+	if(result != SQLITE_DONE) {
+		LOG_ERROR("Failed to get signature delta_pt distance from database.");
+		
+		return -2;
+	}
+
+	return closest;
+}

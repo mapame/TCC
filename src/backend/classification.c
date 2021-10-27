@@ -709,7 +709,8 @@ int predict_event(const model_t *model, load_event_t *l_event) {
 	sort_classes(neighborhood_labels, neighborhood_counts, neighborhood_class_n);
 	
 	for(int i = 0; i < 3 && i < neighborhood_class_n; i++)
-		l_event->possible_appliances[i] = neighborhood_labels[i];
+		if(fabs((get_closest_signature_power(neighborhood_labels[i], l_event->delta_pt) - l_event->delta_pt) / l_event->delta_pt) <= 0.15)
+			l_event->possible_appliances[i] = neighborhood_labels[i];
 	
 	free(neighborhood_labels);
 	free(neighborhood_counts);
