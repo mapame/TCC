@@ -441,10 +441,15 @@ static int pair_load_events() {
 	int pair_score, best_pair_score;
 	load_event_t *best_pair_load_event = NULL;
 	double classification_inliner_threshold, classification_outlier_threshold, classification_absolute_outlier_threshold;
+	int last_appliance_id;
+	int *appliances_max_time_on;
 	
 	classification_inliner_threshold = config_get_value_double("classification_inliner_threshold", 0.5, 2, 1);
 	classification_outlier_threshold = config_get_value_double("classification_outlier_threshold", 1, 10, 1.5);
 	classification_absolute_outlier_threshold = config_get_value_double("classification_absolute_outlier_threshold", 5, 50, 20);
+	
+	if((last_appliance_id = get_appliances_max_time_on(&appliances_max_time_on)) < 0)
+		return -1;
 	
 	pthread_mutex_lock(&load_event_mutex);
 	
@@ -510,6 +515,9 @@ static int pair_load_events() {
 				else if(load_event_on->outlier_score >= classification_outlier_threshold)
 					pair_score -= 1000;
 				
+				if(appliance_id <= last_appliance_id && appliances_max_time_on[appliance_id] > 0 && ((load_event_off->timestamp - load_event_on->timestamp) / 60) > appliances_max_time_on[appliance_id])
+					pair_score -= 8000;
+				
 				pair_score -= score_penalty;
 				
 				// Como o valor inicial de best_pair_score é zero, pontuações iguais ou abaixo de zero não serão pareadas
@@ -538,6 +546,8 @@ static int pair_load_events() {
 			if(open_load_events_file(load_event_off->timestamp)) {
 				pthread_mutex_unlock(&load_event_mutex);
 				
+				free(appliances_max_time_on);
+				
 				return -2;
 			}
 			
@@ -545,6 +555,9 @@ static int pair_load_events() {
 				LOG_ERROR("Failed to write load event pairing to file.");
 				
 				pthread_mutex_unlock(&load_event_mutex);
+				
+				free(appliances_max_time_on);
+				
 				return -3;
 			}
 			
@@ -555,6 +568,8 @@ static int pair_load_events() {
 	}
 	
 	pthread_mutex_unlock(&load_event_mutex);
+	
+	free(appliances_max_time_on);
 	
 	return 0;
 }
