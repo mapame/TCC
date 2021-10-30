@@ -286,10 +286,13 @@ static time_t detect_load_events(time_t last_timestamp, double nominal_line_volt
 			
 			pavg_before = (ptotal_buffer[0] + ptotal_buffer[1]) / 2.0;
 			
-			for(int k = 3; k < DISAGGREGATION_BUFFER_SIZE - 2; k++) {
+			for(int k = 3; k < DISAGGREGATION_BUFFER_SIZE - 1; k++) {
 				pavg_after = (ptotal_buffer[k] + ptotal_buffer[k + 1]) / 2.0;
 				
-				if(fabs(ptotal_buffer[k + 1] - ptotal_buffer[k]) < detection_threshold && fabs(pavg_after - pavg_before) > min_event_power) {
+				if(fabs(ptotal_buffer[k + 1] - ptotal_buffer[k]) < detection_threshold && ((pavg_after - pavg_before) * (ptotal_buffer[3] - ptotal_buffer[1]) > 0.0)) {
+					
+					if(fabs(pavg_after - pavg_before) < min_event_power)
+						break;
 					
 					new_load_event.timestamp = pd_buffer[1].timestamp;
 					new_load_event.duration = k - 1;
