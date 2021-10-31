@@ -407,30 +407,31 @@ static int has_common_appliance_id(const load_event_t *le1, const load_event_t *
 	return qty;
 }
 
-static int get_pair_score(int appliance_id, const load_event_t *load_event_off, const load_event_t *load_event_on) {
-	int score = 0;
+static int calc_base_pair_score(int appliance_id, const load_event_t *load_event_off, const load_event_t *load_event_on) {
+	int score = 6000;
 	int i, j;
 	
 	if(load_event_off == NULL || load_event_on == NULL || appliance_id <= 0)
 		return 0;
 	
-	if((load_event_off->timestamp - load_event_on->timestamp) > (12*3600))
+	if((load_event_off->timestamp - load_event_on->timestamp) > (18*3600))
 		score -= 5000;
 	
-	score -= load_event_off->time_gap * 1000;
-	score -= load_event_on->time_gap * 1000;
 	score -= 20000 * (fabs(load_event_on->delta_pt + load_event_off->delta_pt)/load_event_on->delta_pt);
+	score -= load_event_off->time_gap * 500;
+	score -= load_event_on->time_gap * 500;
+	
 	
 	for(i = 0; i < 3; i++)
 		for(j = 0; j < 3; j++)
 			if(load_event_off->possible_appliances[i] == load_event_on->possible_appliances[j] && load_event_off->possible_appliances[i] == appliance_id) {
-				score += 10000;
-				
+				score += (2-i) * 500;
+				score += (2-j) * 500;
 				
 				return score;
 			}
 	
-	return score;
+	return 0;
 }
 
 static int pair_load_events() {
@@ -506,7 +507,7 @@ static int pair_load_events() {
 			
 			for(appliance_idx = 0; appliance_idx < 3; appliance_idx++) {
 				
-				pair_score = get_pair_score(load_event_off->possible_appliances[appliance_idx], load_event_off, load_event_on);
+				pair_score = calc_base_pair_score(appliance_id, load_event_off, load_event_on);
 				
 				if(load_event_off->outlier_score <= classification_inliner_threshold)
 					pair_score += 1000;
