@@ -435,7 +435,7 @@ static int calc_base_pair_score(int appliance_id, const load_event_t *load_event
 }
 
 static int pair_load_events() {
-	time_t timestamp_limit = time(NULL) - (3600 * 24);
+	time_t timestamp_last_power = power_get_last_timestamp();;
 	int count_off, pos_off;
 	int count_on, pos_on;
 	load_event_t *load_event_off = NULL;
@@ -455,6 +455,9 @@ static int pair_load_events() {
 	if((last_appliance_id = get_appliances_max_time_on(&appliances_max_time_on)) < 0)
 		return -1;
 	
+	if(timestamp_last_power <= 0)
+		timestamp_last_power = time(NULL);
+	
 	pthread_mutex_lock(&load_event_mutex);
 	
 	pos_off = (load_event_buffer_count < LOAD_EVENT_BUFFER_SIZE) ? 0 : load_event_buffer_pos;
@@ -467,7 +470,7 @@ static int pair_load_events() {
 		if(load_event_off->state != 2 || load_event_off->delta_pt >= 0.0)
 			continue;
 		
-		if(load_event_off->timestamp < timestamp_limit || load_event_off->outlier_score >= classification_absolute_outlier_threshold)
+		if(load_event_off->timestamp < (timestamp_last_power - (3600 * 24)) || load_event_off->outlier_score >= classification_absolute_outlier_threshold)
 			continue;
 		
 		score_penalty = 0;
@@ -485,7 +488,7 @@ static int pair_load_events() {
 			if(--pos_on < 0)
 				pos_on += LOAD_EVENT_BUFFER_SIZE;
 			
-			if(load_event_on->timestamp < timestamp_limit || load_event_on->timestamp >= load_event_off->timestamp)
+			if(load_event_on->timestamp < (timestamp_last_power - (3600 * 24)) || load_event_on->timestamp >= load_event_off->timestamp)
 				break;
 			
 			if(load_event_on->state != 2)
