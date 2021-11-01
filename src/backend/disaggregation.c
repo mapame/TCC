@@ -483,6 +483,7 @@ static int pair_load_events() {
 			pos_on += LOAD_EVENT_BUFFER_SIZE;
 		
 		for(count_on = 0; count_on < load_event_buffer_count; count_on++) {
+			
 			load_event_on = &load_event_buffer[pos_on];
 			
 			if(--pos_on < 0)
@@ -491,7 +492,7 @@ static int pair_load_events() {
 			if(load_event_on->timestamp < (timestamp_last_power - (3600 * 24)) || load_event_on->timestamp >= load_event_off->timestamp)
 				break;
 			
-			if(load_event_on->state != 2)
+			if(load_event_on->state == 1)
 				continue;
 			
 			if(has_common_appliance_id(load_event_off, load_event_on) == 0 || load_event_on->outlier_score >= classification_absolute_outlier_threshold)
@@ -499,16 +500,23 @@ static int pair_load_events() {
 			
 			// Se encontrar outro evento de desligamento com ID em comum, aumenta a penalidade e pula pro próximo
 			if(load_event_on->delta_pt <= 0.0) {
-				score_penalty += 1000;
+				score_penalty += 500;
 				
 				// Se o valor de potência for próximo, aumenta ainda mais a penalidade
-				if(fabs(load_event_on->delta_pt - load_event_off->delta_pt)/(-load_event_on->delta_pt) < 0.1)
+				if(load_event_off->outlier_score < classification_outlier_threshold && fabs(load_event_on->delta_pt - load_event_off->delta_pt)/(-load_event_on->delta_pt) < 0.1)
 					score_penalty += 1000;
 				
 				continue;
 			}
 			
+			if(load_event_on->state == 3)
+				continue;
+			
 			for(appliance_idx = 0; appliance_idx < 3; appliance_idx++) {
+				int appliance_id = load_event_off->possible_appliances[appliance_idx];
+				
+				if(appliance_id <= 0)
+					continue;
 				
 				pair_score = calc_base_pair_score(appliance_id, load_event_off, load_event_on);
 				
@@ -524,6 +532,9 @@ static int pair_load_events() {
 				
 				if(appliance_id <= last_appliance_id && appliances_max_time_on[appliance_id] > 0 && ((load_event_off->timestamp - load_event_on->timestamp) / 60) > appliances_max_time_on[appliance_id])
 					pair_score -= 8000;
+				
+				if(load_event_off->timestamp < (timestamp_last_power - (3600 * 18)))
+					pair_score += 1000;
 				
 				pair_score -= score_penalty;
 				
