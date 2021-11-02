@@ -205,30 +205,30 @@ function updateAnnotations() {
 			series: "Potência",
 			x: eventItem.timestamp * 1000,
 			shortText: eventItem.state,
-			//shortText: ((eventItem.delta_pt > 0) ? "L" : "D"),
-			//icon: (eventItem.delta_pt > 0) ? "img/arrow-up-bold-box-outline.png" : "img/arrow-down-bold-box-outline.png",
-			//width: 16,
-			//height: 16,
-			text: "Duração: " + eventItem.duration + " s\ndP: " + eventItem.delta_pt.toFixed(1) + " W (" + eventItem.delta_p[0].toFixed(1) + " | " + eventItem.delta_p[1].toFixed(1) + ")\nPpk: " + eventItem.peak_pt.toFixed(1) + " W\ndS(VA): " + eventItem.delta_s[0].toFixed(1) + " | " + eventItem.delta_s[1].toFixed(1) + "\ndQ(VAr): " + eventItem.delta_q[0].toFixed(1) + " | " + eventItem.delta_q[1].toFixed(1),
+			text: eventItem.raw_delta_pt.toFixed(1) + " W em " + eventItem.duration + " seg\n",
 			cssClass: highlighted ? "dygraph-highlighted-annotation" : "",
 			tickHeight: 20,
-			tickColor: highlighted ? "red" : "gray",
-			tickWidth: highlighted ? 3 : 1,
+			tickColor: highlighted ? "red" : "black",
+			tickWidth: 1,
 		};
+		
+		annotation.text += "\ndP: " + eventItem.delta_pt.toFixed(1) + " W (" + eventItem.delta_p[0].toFixed(1) + " | " + eventItem.delta_p[1].toFixed(1) + ")";
+		annotation.text += "\nPpk: " + eventItem.peak_pt.toFixed(1) + " W";
+		annotation.text += "\ndS(VA): " + eventItem.delta_s[0].toFixed(1) + " | " + eventItem.delta_s[1].toFixed(1);
+		annotation.text += "\ndQ(VAr): " + eventItem.delta_q[0].toFixed(1) + " | " + eventItem.delta_q[1].toFixed(1);
 		
 		if(eventItem.time_gap > 0)
 			annotation.text += "\nLacuna: " + eventItem.time_gap + " s";
 		
 		if(eventItem.state >= 3)
-			annotation.text += "\n\n" + window.smceeApplianceList.get(eventItem.pair_appliance_id).name + " (score: " + eventItem.pair_score + ")";
+			annotation.text += "\n\nAparelho: " + window.smceeApplianceList.get(eventItem.pair_appliance_id).name + " (" + eventItem.pair_score + ")";
 		
 		if(eventItem.state >= 2) {
 			annotation.text += "\n\nOutlier Score: " + eventItem.outlier_score.toFixed(2) + "\n";
 			
-			annotation.text += "Possiveis aparelhos:";
-			for(let idx = 0; idx < 3 && eventItem.possible_appliances[idx] > 0; idx++)
-				annotation.text += "\n- " + window.smceeApplianceList.get(eventItem.possible_appliances[idx]).name;
-		
+			for(let idx = 0; idx < 3; idx++)
+				if(eventItem.possible_appliances[idx] > 0)
+					annotation.text += "\n" + (idx + 1) + "- " + window.smceeApplianceList.get(eventItem.possible_appliances[idx]).name;
 		}
 		
 		annotations.push(annotation);

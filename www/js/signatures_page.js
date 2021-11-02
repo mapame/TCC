@@ -379,7 +379,8 @@ function fetchPowerEvents(secondQty) {
 			document.getElementById("button-add-signatures").classList.remove("is-loading");
 			document.getElementById("button-more-hours").classList.remove("is-loading");
 			
-			updateAnnotations();
+			if(typeof window.smceeSelectedEvents == "object")
+				updateAnnotations()
 			
 		} else if(this.status === 401) {
 			redirectToLogin();
@@ -404,16 +405,38 @@ function updateAnnotations() {
 		return;
 	
 	for(eventItem of window.smceeLoadEvents.values()) {
-		annotations.push({
+		let annotation = {
 			series: "Potência",
 			x: eventItem.timestamp * 1000,
 			icon: (window.smceeSelectedEvents.has(eventItem.timestamp) ? "img/checkbox-marked-outline.png" : (window.smceeSignatures.has(eventItem.timestamp) ? "img/checkbox-blank-badge-outline.png" : "img/checkbox-blank-outline.png")),
 			width: 16,
 			height: 16,
-			text: "dur: " + eventItem.duration + " secs\ndP: " + eventItem.delta_pt.toFixed(1) + " W (" + eventItem.delta_p[0].toFixed(1) + " | " + eventItem.delta_p[1].toFixed(1) + ")\ndQ: " + eventItem.delta_q[0].toFixed(1) + " | " + eventItem.delta_q[1].toFixed(1) + " VAr",
-			//tickColor:  (eventItem.delta_pt > 0) ? "orange" : "blue",
+			text: eventItem.raw_delta_pt.toFixed(1) + " W em " + eventItem.duration + " seg\n",
+			tickColor: "black",
+			tickWidth: 1,
 			tickHeight: 10,
-		});
+		};
+		
+		annotation.text += "\ndP: " + eventItem.delta_pt.toFixed(1) + " W (" + eventItem.delta_p[0].toFixed(1) + " | " + eventItem.delta_p[1].toFixed(1) + ")";
+		annotation.text += "\nPpk: " + eventItem.peak_pt.toFixed(1) + " W";
+		annotation.text += "\ndS(VA): " + eventItem.delta_s[0].toFixed(1) + " | " + eventItem.delta_s[1].toFixed(1);
+		annotation.text += "\ndQ(VAr): " + eventItem.delta_q[0].toFixed(1) + " | " + eventItem.delta_q[1].toFixed(1);
+		
+		if(eventItem.time_gap > 0)
+			annotation.text += "\nLacuna: " + eventItem.time_gap + " s";
+		
+		if(eventItem.state >= 3)
+			annotation.text += "\n\nAparelho: " + window.smceeApplianceList.get(eventItem.pair_appliance_id).name + " (" + eventItem.pair_score + ")";
+		
+		if(eventItem.state >= 2) {
+			annotation.text += "\n\nOutlier Score: " + eventItem.outlier_score.toFixed(2) + "\n";
+			
+			for(let idx = 0; idx < 3; idx++)
+				if(eventItem.possible_appliances[idx] > 0)
+					annotation.text += "\n" + (idx + 1) + "- " + window.smceeApplianceList.get(eventItem.possible_appliances[idx]).name;
+		}
+		
+		annotations.push(annotation);
 	}
 	
 	window.smceeNewSignaturePowerChart.setAnnotations(annotations);
