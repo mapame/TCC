@@ -254,6 +254,7 @@ static time_t detect_load_events(time_t last_timestamp, double nominal_line_volt
 	load_event_t new_load_event;
 	int time_gap;
 	double pavg_before, pavg_after;
+	double delta_acc = 0;
 	
 	memset(&new_load_event, 0, sizeof(load_event_t));
 	
@@ -282,14 +283,23 @@ static time_t detect_load_events(time_t last_timestamp, double nominal_line_volt
 		if(time_gap > MAX_TIME_GAP)
 			continue;
 		
-		if(fabs(ptotal_buffer[1] - ptotal_buffer[0]) < detection_threshold && fabs(ptotal_buffer[2] - ptotal_buffer[1]) > detection_threshold && fabs(ptotal_buffer[3] - ptotal_buffer[1]) > detection_threshold) {
+		for(int i = 1; i < DISAGGREGATION_BUFFER_SIZE - 1; i++) {
+			if(i >= 3 && fabs(ptotal_buffer[i + 1] - ptotal_buffer[i]) < detection_threshold)
+				break;
+			
+			delta_acc += ptotal_buffer[i + 1] - ptotal_buffer[i];
+		}
+		
+		delta_acc = fabs(delta_acc);
+		
+		if(fabs(ptotal_buffer[1] - ptotal_buffer[0]) < (detection_threshold + delta_acc / 200) && fabs(ptotal_buffer[2] - ptotal_buffer[1]) > (detection_threshold + delta_acc / 500) && fabs(ptotal_buffer[3] - ptotal_buffer[1]) > (detection_threshold + delta_acc / 500)) {
 			
 			pavg_before = (ptotal_buffer[0] + ptotal_buffer[1]) / 2.0;
 			
 			for(int k = 3; k < DISAGGREGATION_BUFFER_SIZE - 1; k++) {
 				pavg_after = (ptotal_buffer[k] + ptotal_buffer[k + 1]) / 2.0;
 				
-				if(fabs(ptotal_buffer[k + 1] - ptotal_buffer[k]) < detection_threshold && ((pavg_after - pavg_before) * (ptotal_buffer[3] - ptotal_buffer[1]) > 0.0)) {
+				if(fabs(ptotal_buffer[k + 1] - ptotal_buffer[k]) < (detection_threshold + delta_acc / 200) && ((pavg_after - pavg_before) * (ptotal_buffer[3] - ptotal_buffer[1]) > 0.0)) {
 					
 					if(fabs(pavg_after - pavg_before) < min_event_power)
 						break;
