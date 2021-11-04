@@ -371,6 +371,7 @@ function formatEnergyData(receivedEnergyData, energyDataType, comparisonData) {
 function formatDisaggregatedEnergyData(receivedEnergyData, energyDataType, applianceQty) {
 	var numRows = 0;
 	var totalEnergy = 0;
+	var appliances = new Set();
 	
 	if(applianceQty <= 0)
 		return;
@@ -393,6 +394,8 @@ function formatDisaggregatedEnergyData(receivedEnergyData, energyDataType, appli
 			
 			if(element.appliance_energy[applianceId] == null)
 				continue;
+			
+			appliances.add(applianceId);
 			
 			window.smceeEnergyData.disaggregatedEnergyData.applianceTotalEnergy[applianceId] += element.appliance_energy[applianceId];
 			window.smceeEnergyData.disaggregatedEnergyData.applianceTotalCost[applianceId] += element.appliance_cost[applianceId];
@@ -418,7 +421,12 @@ function formatDisaggregatedEnergyData(receivedEnergyData, energyDataType, appli
 	window.smceeEnergyData.disaggregatedEnergyData.applianceCost = new Map();
 	
 	for(let applianceId = 0; applianceId < applianceQty; applianceId++) {
-		if(window.smceeEnergyData.disaggregatedEnergyData.applianceTotalEnergy[applianceId] >= totalEnergy * 0.005) {
+		let applianceIdTotalEnergy = window.smceeEnergyData.disaggregatedEnergyData.applianceTotalEnergy[applianceId];
+		
+		if(applianceIdTotalEnergy <= 0)
+			continue;
+		
+		if(appliances.size < 12 || applianceIdTotalEnergy >= totalEnergy * 0.005) {
 			window.smceeEnergyData.disaggregatedEnergyData.applianceEnergy.set(applianceId, new Array(numRows).fill(0));
 			window.smceeEnergyData.disaggregatedEnergyData.applianceCost.set(applianceId, new Array(numRows).fill(0));
 		} else {
@@ -438,7 +446,7 @@ function formatDisaggregatedEnergyData(receivedEnergyData, energyDataType, appli
 			if(element.appliance_energy[applianceId] == null)
 				continue;
 			
-			if(window.smceeEnergyData.disaggregatedEnergyData.applianceTotalEnergy[applianceId] >= totalEnergy * 0.005) {
+			if(window.smceeEnergyData.disaggregatedEnergyData.applianceEnergy.has(applianceId)) {
 				window.smceeEnergyData.disaggregatedEnergyData.applianceEnergy.get(applianceId)[index] += element.appliance_energy[applianceId];
 				window.smceeEnergyData.disaggregatedEnergyData.applianceCost.get(applianceId)[index] += element.appliance_cost[applianceId];
 			} else {
@@ -618,9 +626,11 @@ function updateChart() {
 		window.smceeEnergyPieChart.data.datasets[0].backgroundColor.push('#b4b4b4');
 		window.smceeEnergyPieChart.data.labels.push('Desconhecido');
 		
-		window.smceeEnergyPieChart.data.datasets[0].data.push(window.smceeEnergyData.disaggregatedEnergyData.insignificantAppliancesTotalEnergy);
-		window.smceeEnergyPieChart.data.datasets[0].backgroundColor.push(hsvToRGB(hue, sat, val));
-		window.smceeEnergyPieChart.data.labels.push('Outros');
+		if(window.smceeEnergyData.disaggregatedEnergyData.insignificantAppliancesTotalEnergy > 0) {
+			window.smceeEnergyPieChart.data.datasets[0].data.push(window.smceeEnergyData.disaggregatedEnergyData.insignificantAppliancesTotalEnergy);
+			window.smceeEnergyPieChart.data.datasets[0].backgroundColor.push(hsvToRGB(hue, sat, val));
+			window.smceeEnergyPieChart.data.labels.push('Outros');
+		}
 		
 		window.smceeEnergyBarChart.data.datasets.push({
 			label: 'Stand-by',
@@ -636,12 +646,14 @@ function updateChart() {
 			yAxisID: 'y',
 		});
 		
-		window.smceeEnergyBarChart.data.datasets.push({
-			label: 'Outros',
-			backgroundColor: hsvToRGB(hue, sat, val),
-			data: window.smceeEnergyData.disaggregatedEnergyData.insignificantAppliancesEnergy,
-			yAxisID: 'y',
-		});
+		if(window.smceeEnergyData.disaggregatedEnergyData.insignificantAppliancesTotalEnergy > 0) {
+			window.smceeEnergyBarChart.data.datasets.push({
+				label: 'Outros',
+				backgroundColor: hsvToRGB(hue, sat, val),
+				data: window.smceeEnergyData.disaggregatedEnergyData.insignificantAppliancesEnergy,
+				yAxisID: 'y',
+			});
+		}
 		
 		for(const applianceId of window.smceeEnergyData.disaggregatedEnergyData.applianceEnergy.keys()) {
 			hue = (hue + 0.618033988749895) % 1;
