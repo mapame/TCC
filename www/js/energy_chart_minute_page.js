@@ -137,6 +137,7 @@ function generateDisaggregatedEnergyFile(applianceQty, energyData, startTimestam
 	var fileData = [];
 	var energyEntry;
 	var disaggregatedEnergySum;
+	var excessPowerCounter = 0;
 	
 	fileData.push([new Date((startTimestamp - 1) * 1000)].concat(new Array(applianceQty + 1).fill(null)));
 	
@@ -161,10 +162,19 @@ function generateDisaggregatedEnergyFile(applianceQty, energyData, startTimestam
 		
 		energyEntry[applianceQty + 1] = (element.total_energy - disaggregatedEnergySum) * 1000;
 		
+		if(energyEntry[applianceQty + 1] < 0) {
+			energyEntry[applianceQty + 1] = 0;
+			
+			excessPowerCounter++;
+		}
+		
 		fileData.push(energyEntry);
 		
 		lastTimestamp = element.timestamp;
 	}
+	
+	if(excessPowerCounter > 0)
+		console.warn(excessPowerCounter + " minutos com potência excedente.");
 	
 	fileData.push([new Date((endTimestamp + 1) * 1000)].concat(new Array(applianceQty + 1).fill(null)));
 	
