@@ -52,7 +52,7 @@ function initPage() {
 	});
 	
 	updateChart();
-	fetchApplianceNames();
+	fetchApplianceList(function() { document.getElementById("disaggregation-checkbox").disabled = false; });
 }
 
 function updateChart() {
@@ -68,7 +68,7 @@ function updateChart() {
 		window.smceeEnergyChart.resetZoom();
 	} else {
 		if(disaggregatedEnergyMode) {
-			window.smceeEnergyChart.setVisibility(new Array(window.smceeApplianceNames.size + 1).fill(true));
+			window.smceeEnergyChart.setVisibility(new Array(window.smceeApplianceList.size + 1).fill(true));
 			
 			window.smceeEnergyChart.updateOptions({
 				'stackedGraph' : document.getElementById("stacked-checkbox").checked
@@ -77,36 +77,6 @@ function updateChart() {
 			window.smceeEnergyChart.setVisibility([true, document.getElementById("reactive-checkbox").checked]);
 		}
 	}
-}
-
-function fetchApplianceNames() {
-	var xhrApplianceList = new XMLHttpRequest();
-	
-	xhrApplianceList.onload = function() {
-		if(this.status === 200) {
-			var responseObject = JSON.parse(this.responseText);
-			
-			window.smceeApplianceNames = new Map();
-			
-			for(const applianceItem of responseObject)
-				window.smceeApplianceNames.set(applianceItem.id, applianceItem.name);
-			
-			document.getElementById("disaggregation-checkbox").disabled = false;
-			
-		} else if(this.status === 401) {
-			redirectToLogin();
-		} else {
-			console.error("Failed to fetch appliance list. Status: " + this.status);
-		}
-	}
-	
-	xhrApplianceList.open("GET", window.smceeApiUrlBase + "appliances");
-	
-	xhrApplianceList.timeout = 2000;
-	
-	xhrApplianceList.setRequestHeader("Authorization", "Bearer " + localStorage.getItem("access_key"));
-	
-	xhrApplianceList.send();
 }
 
 function generateEnergyFile(energyData, startTimestamp, endTimestamp) {
@@ -203,12 +173,13 @@ function fetchEnergyData(disaggregatedEnergy=false) {
 			window.smceeEnergyData.disaggregated = disaggregatedEnergy;
 			
 			if(disaggregatedEnergy) {
-				for(applianceName of window.smceeApplianceNames.values())
-					labels.push(applianceName);
+				for(const applianceItem of window.smceeApplianceList.values()) {
+					labels.push(applianceItem.name);
+				}
 				
 				labels.push("Desconhecido");
 				
-				window.smceeEnergyData.data = generateDisaggregatedEnergyFile(window.smceeApplianceNames.size, responseObj, startTimestamp, endTimestamp);
+				window.smceeEnergyData.data = generateDisaggregatedEnergyFile(window.smceeApplianceList.size, responseObj, startTimestamp, endTimestamp);
 			} else {
 				labels.push("Energia", "Energia Reativa");
 				
@@ -222,12 +193,12 @@ function fetchEnergyData(disaggregatedEnergy=false) {
 			});
 			
 			if(disaggregatedEnergy)
-				window.smceeEnergyChart.setVisibility(new Array(window.smceeApplianceNames.size + 1).fill(true));
+				window.smceeEnergyChart.setVisibility(new Array(window.smceeApplianceList.size + 1).fill(true));
 			else
 				window.smceeEnergyChart.setVisibility([true, document.getElementById("reactive-checkbox").checked]);
 			
 			document.getElementById('date-input').disabled = false;
-			document.getElementById('disaggregation-checkbox').disabled = (typeof window.smceeApplianceNames == "undefined");
+			document.getElementById('disaggregation-checkbox').disabled = (typeof window.smceeApplianceList == "undefined");
 			document.getElementById("reactive-checkbox").disabled = disaggregatedEnergy;
 			document.getElementById("stacked-checkbox").disabled = !disaggregatedEnergy;
 			

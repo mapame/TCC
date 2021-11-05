@@ -35,7 +35,7 @@ function initPage() {
 	});
 	
 	fetchPowerData(window.smceePowerDataHours * 3600);
-	fetchApplianceList();
+	fetchApplianceList(function() { fetchSignatures(); updateApplianceSelects(); });
 }
 
 function showMoreHours() {
@@ -57,37 +57,6 @@ function toggleAllCheckboxes() {
 	
 	for(checkboxItem of document.getElementsByClassName("signature-checkbox"))
 		checkboxItem.checked = checkall;
-}
-
-function fetchApplianceList() {
-	var xhrApplianceList = new XMLHttpRequest();
-	
-	xhrApplianceList.onload = function() {
-		if(this.status === 200) {
-			var responseObject = JSON.parse(this.responseText);
-			
-			window.smceeApplianceList = new Map();
-			
-			for(applianceItem of responseObject)
-				window.smceeApplianceList.set(applianceItem.id, applianceItem);
-			
-			fetchSignatures();
-			updateApplianceSelects();
-			
-		} else if(this.status === 401) {
-			redirectToLogin();
-		} else {
-			console.error("Failed to fetch appliance list. Status: " + this.status);
-		}
-	}
-	
-	xhrApplianceList.open("GET", window.smceeApiUrlBase + "appliances");
-	
-	xhrApplianceList.timeout = 2000;
-	
-	xhrApplianceList.setRequestHeader("Authorization", "Bearer " + localStorage.getItem("access_key"));
-	
-	xhrApplianceList.send();
 }
 
 function updateApplianceSelects() {

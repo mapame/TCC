@@ -8,6 +8,8 @@ function initPage() {
 	
 	fetchEnergyDateInfo();
 	
+	fetchApplianceList(function() {document.getElementById("disaggregated-energy-checkbox").disabled = false;});
+	
 	window.smceeEnergyData = {};
 	window.smceeEnergyData.type = "";
 	window.smceeEnergyData.energyData = {};
@@ -104,61 +106,6 @@ function initPage() {
 			}
 		}
 	});
-}
-
-function hsvToRGB(hue, saturation, value) {
-	var red;
-	var green;
-	var blue;
-	if (saturation === 0) {
-		red = value;
-		green = value;
-		blue = value;
-	} else {
-		var i = Math.floor(hue * 6);
-		var f = hue * 6 - i;
-		var p = value * (1 - saturation);
-		var q = value * (1 - saturation * f);
-		var t = value * (1 - saturation * (1 - f));
-		switch (i) {
-			case 1:
-				red = q;
-				green = value;
-				blue = p;
-				break;
-			case 2:
-				red = p;
-				green = value;
-				blue = t;
-				break;
-			case 3:
-				red = p;
-				green = q;
-				blue = value;
-				break;
-			case 4:
-				red = t;
-				green = p;
-				blue = value;
-				break;
-			case 5:
-				red = value;
-				green = p;
-				blue = q;
-				break;
-			case 6: // fall through
-			case 0:
-				red = value;
-				green = t;
-				blue = p;
-				break;
-		}
-	}
-	red = Math.floor(255 * red + 0.5);
-	green = Math.floor(255 * green + 0.5);
-	blue = Math.floor(255 * blue + 0.5);
-	
-	return "#" + red.toString(16).padStart(2, "0") + green.toString(16).padStart(2, "0") + blue.toString(16).padStart(2, "0");
 }
 
 function daysInMonth(month, year) {
@@ -303,8 +250,6 @@ function fetchEnergyDateInfo() {
 			
 			changeChartType();
 			
-			fetchApplianceNames();
-			
 		} else if(this.status === 401) {
 			redirectToLogin();
 		} else {
@@ -319,36 +264,6 @@ function fetchEnergyDateInfo() {
 	xhrEnergyDates.setRequestHeader("Authorization", "Bearer " + localStorage.getItem("access_key"));
 	
 	xhrEnergyDates.send();
-}
-
-function fetchApplianceNames() {
-	var xhrApplianceList = new XMLHttpRequest();
-	
-	xhrApplianceList.onload = function() {
-		if(this.status === 200) {
-			var responseObject = JSON.parse(this.responseText);
-			
-			window.smceeApplianceNames = new Map();
-			
-			for(const applianceItem of responseObject)
-				window.smceeApplianceNames.set(applianceItem.id, applianceItem.name);
-			
-			document.getElementById("disaggregated-energy-checkbox").disabled = false;
-			
-		} else if(this.status === 401) {
-			redirectToLogin();
-		} else {
-			console.error("Failed to fetch appliance list. Status: " + this.status);
-		}
-	}
-	
-	xhrApplianceList.open("GET", window.smceeApiUrlBase + "appliances");
-	
-	xhrApplianceList.timeout = 2000;
-	
-	xhrApplianceList.setRequestHeader("Authorization", "Bearer " + localStorage.getItem("access_key"));
-	
-	xhrApplianceList.send();
 }
 
 function formatEnergyData(receivedEnergyData, energyDataType, comparisonData) {
@@ -480,7 +395,7 @@ function fetchEnergyData(energyDataType, disaggregatedEnergy=false, comparisonDa
 			let energyTarget = comparisonData ? window.smceeEnergyData.energyComparisonData : window.smceeEnergyData.energyData;
 			
 			if(disaggregatedEnergy) {
-				formatDisaggregatedEnergyData(responseObj, energyDataType, window.smceeApplianceNames.size);
+				formatDisaggregatedEnergyData(responseObj, energyDataType, window.smceeApplianceList.size);
 			} else {
 				formatEnergyData(responseObj, energyDataType, comparisonData)
 			}
@@ -491,7 +406,7 @@ function fetchEnergyData(energyDataType, disaggregatedEnergy=false, comparisonDa
 			document.getElementById('comparison-checkbox').disabled = disaggregatedEnergy;
 			document.getElementById('cost-checkbox').disabled = disaggregatedEnergy;
 			document.getElementById('coverage-checkbox').disabled = disaggregatedEnergy;
-			document.getElementById("disaggregated-energy-checkbox").disabled = (typeof window.smceeApplianceNames == "undefined");
+			document.getElementById("disaggregated-energy-checkbox").disabled = (typeof window.smceeApplianceList == "undefined");
 			
 		} else if(this.status === 401) {
 			redirectToLogin();
@@ -607,10 +522,6 @@ function updateChart() {
 	window.smceeEnergyPieChart.data.datasets = [];
 	
 	if(disaggregatedEnergyCheckbox.checked) {
-		let hue = 0.2;
-		let sat = 0.5;
-		let val = 0.8;
-		
 		window.smceeEnergyPieChart.data.labels = [];
 		window.smceeEnergyPieChart.data.datasets.push({
 			label: 'Energia',
@@ -628,7 +539,7 @@ function updateChart() {
 		
 		if(window.smceeEnergyData.disaggregatedEnergyData.insignificantAppliancesTotalEnergy > 0) {
 			window.smceeEnergyPieChart.data.datasets[0].data.push(window.smceeEnergyData.disaggregatedEnergyData.insignificantAppliancesTotalEnergy);
-			window.smceeEnergyPieChart.data.datasets[0].backgroundColor.push(hsvToRGB(hue, sat, val));
+			window.smceeEnergyPieChart.data.datasets[0].backgroundColor.push('#003388');
 			window.smceeEnergyPieChart.data.labels.push('Outros');
 		}
 		
@@ -649,25 +560,23 @@ function updateChart() {
 		if(window.smceeEnergyData.disaggregatedEnergyData.insignificantAppliancesTotalEnergy > 0) {
 			window.smceeEnergyBarChart.data.datasets.push({
 				label: 'Outros',
-				backgroundColor: hsvToRGB(hue, sat, val),
+				backgroundColor: '#003388',
 				data: window.smceeEnergyData.disaggregatedEnergyData.insignificantAppliancesEnergy,
 				yAxisID: 'y',
 			});
 		}
 		
 		for(const applianceId of window.smceeEnergyData.disaggregatedEnergyData.applianceEnergy.keys()) {
-			hue = (hue + 0.618033988749895) % 1;
-			
 			window.smceeEnergyBarChart.data.datasets.push({
-				label: window.smceeApplianceNames.get(applianceId + 1),
-				backgroundColor: hsvToRGB(hue, sat, val),
+				label: window.smceeApplianceList.get(applianceId + 1).name,
+				backgroundColor: window.smceeApplianceList.get(applianceId + 1).color,
 				data: window.smceeEnergyData.disaggregatedEnergyData.applianceEnergy.get(applianceId),
 				yAxisID: 'y',
 			});
 			
 			window.smceeEnergyPieChart.data.datasets[0].data.push(window.smceeEnergyData.disaggregatedEnergyData.applianceTotalEnergy[applianceId]);
-			window.smceeEnergyPieChart.data.datasets[0].backgroundColor.push(hsvToRGB(hue, sat, val));
-			window.smceeEnergyPieChart.data.labels.push(window.smceeApplianceNames.get(applianceId + 1));
+			window.smceeEnergyPieChart.data.datasets[0].backgroundColor.push(window.smceeApplianceList.get(applianceId + 1).color);
+			window.smceeEnergyPieChart.data.labels.push(window.smceeApplianceList.get(applianceId + 1).name);
 		}
 		
 		window.smceeEnergyPieChart.update();

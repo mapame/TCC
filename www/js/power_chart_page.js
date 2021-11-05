@@ -46,7 +46,7 @@ window.onload = function () {
 function initPage() {
 	userInfoFetch(function() {navbarPopulateItems("main-menu");});
 	
-	fetchApplianceList();
+	fetchApplianceList(enableEventCheckbox);
 	fetchPowerData(12 * 3600);
 }
 
@@ -61,6 +61,11 @@ function changeDisplayEvents() {
 		updateAnnotations();
 	else
 		window.smceePowerChart.setAnnotations([]);
+}
+
+function enableEventCheckbox() {
+	if(typeof window.smceeLoadEvents == "object" && typeof window.smceeApplianceList == "object")
+		document.getElementById("checkbox-display-events").disabled = false;
 }
 
 function fetchPowerData(secondQty) {
@@ -174,9 +179,9 @@ function fetchPowerEvents(secondQty) {
 			for(eventItem of responseObject)
 				window.smceeLoadEvents.set(eventItem.timestamp, eventItem);
 			
-			if(typeof window.smceeApplianceList == "object")
-				document.getElementById("checkbox-display-events").disabled = false;
+			enableEventCheckbox();
 			
+			document.getElementById("button-show-voltage-container").classList.remove("is-loading");
 		} else if(this.status === 401) {
 			redirectToLogin();
 		} else {
@@ -258,37 +263,4 @@ function annotationClickHandler(annotation, point, dygraph, event) {
 	}
 	
 	updateAnnotations();
-}
-
-function fetchApplianceList() {
-	var xhrApplianceList = new XMLHttpRequest();
-	
-	xhrApplianceList.onload = function() {
-		if(this.status === 200) {
-			var responseObject = JSON.parse(this.responseText);
-			
-			window.smceeApplianceList = new Map();
-			
-			for(applianceItem of responseObject)
-				window.smceeApplianceList.set(applianceItem.id, applianceItem);
-			
-			document.getElementById("button-show-voltage-container").classList.remove("is-loading");
-			
-			if(typeof window.smceeLoadEvents == "object")
-				document.getElementById("checkbox-display-events").disabled = false;
-			
-		} else if(this.status === 401) {
-			redirectToLogin();
-		} else {
-			console.error("Failed to fetch appliance list. Status: " + this.status);
-		}
-	}
-	
-	xhrApplianceList.open("GET", window.smceeApiUrlBase + "appliances");
-	
-	xhrApplianceList.timeout = 2000;
-	
-	xhrApplianceList.setRequestHeader("Authorization", "Bearer " + localStorage.getItem("access_key"));
-	
-	xhrApplianceList.send();
 }

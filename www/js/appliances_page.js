@@ -10,7 +10,7 @@ function initPage() {
 	document.getElementById("inactive-filter-checkbox").onchange = updateApplianceTable;
 	document.getElementById("button-discard-appliance").onclick = modalCloseAll;
 	
-	fetchApplianceList();
+	fetchApplianceList(updateApplianceTable);
 }
 
 function openAddApplianceModal() {
@@ -111,36 +111,6 @@ function updateApplianceTable() {
 		
 		applianceTableAddItem(applianceItem);
 	}
-}
-
-function fetchApplianceList() {
-	var xhrApplianceList = new XMLHttpRequest();
-	
-	xhrApplianceList.onload = function() {
-		if(this.status === 200) {
-			var responseObject = JSON.parse(this.responseText);
-			
-			window.smceeApplianceList = new Map();
-			
-			for(applianceItem of responseObject)
-				window.smceeApplianceList.set(applianceItem.id, applianceItem);
-			
-			updateApplianceTable();
-			
-		} else if(this.status === 401) {
-			redirectToLogin();
-		} else {
-			console.error("Failed to fetch appliance list. Status: " + this.status);
-		}
-	}
-	
-	xhrApplianceList.open("GET", window.smceeApiUrlBase + "appliances");
-	
-	xhrApplianceList.timeout = 2000;
-	
-	xhrApplianceList.setRequestHeader("Authorization", "Bearer " + localStorage.getItem("access_key"));
-	
-	xhrApplianceList.send();
 }
 
 function validateApplianceForm() {

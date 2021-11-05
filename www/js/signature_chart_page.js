@@ -30,7 +30,7 @@ function initPage() {
 		}
 	});
 	
-	fetchApplianceList();
+	fetchApplianceList(function() { fetchSignatures(); updateApplianceSelect(); });
 }
 
 function updateSignatureChart() {
@@ -48,7 +48,7 @@ function updateSignatureChart() {
 		document.getElementById("event-type-select").disabled = false;
 	}
 	
-	if(typeof window.smceeAppliances != "object" || typeof window.smceeSignatures != "object")
+	if(typeof window.smceeApplianceList != "object" || typeof window.smceeSignatures != "object")
 		return;
 	
 	window.smceeSignatureScatterChart.datasets = [];
@@ -72,7 +72,7 @@ function updateSignatureChart() {
 		
 		if(signatureItem.appliance_id === applianceId)
 			selectedData.push(value);
-		else if(window.smceeAppliances.get(signatureItem.appliance_id).is_active)
+		else if(window.smceeApplianceList.get(signatureItem.appliance_id).is_active)
 			activeData.push(value);
 		else
 			inactiveData.push(value);
@@ -105,50 +105,19 @@ function updateApplianceSelect() {
 	var applianceSelectElement = document.getElementById("appliance-select");
 	var selectOptionElement;
 	
-	if(typeof window.smceeAppliances != "object" || applianceSelectElement === null)
+	if(typeof window.smceeApplianceList != "object" || applianceSelectElement === null)
 		return;
 	
 	while(applianceSelectElement.childElementCount > 1)
 		applianceSelectElement.removeChild(applianceSelectElement.lastChild);
 	
-	for(applianceItem of window.smceeAppliances.values()) {
+	for(applianceItem of window.smceeApplianceList.values()) {
 		selectOptionElement = document.createElement("option");
 		selectOptionElement.innerText = applianceItem.name + (applianceItem.is_active ? "" : " (inativo)");
 		selectOptionElement.value = applianceItem.id;
 		
 		applianceSelectElement.appendChild(selectOptionElement);
 	}
-}
-
-function fetchApplianceList() {
-	var xhrApplianceList = new XMLHttpRequest();
-	
-	xhrApplianceList.onload = function() {
-		if(this.status === 200) {
-			var responseObject = JSON.parse(this.responseText);
-			
-			window.smceeAppliances = new Map();
-			
-			for(applianceItem of responseObject)
-				window.smceeAppliances.set(applianceItem.id, applianceItem);
-			
-			fetchSignatures();
-			updateApplianceSelect();
-			
-		} else if(this.status === 401) {
-			redirectToLogin();
-		} else {
-			console.error("Failed to fetch appliance list. Status: " + this.status);
-		}
-	}
-	
-	xhrApplianceList.open("GET", window.smceeApiUrlBase + "appliances");
-	
-	xhrApplianceList.timeout = 2000;
-	
-	xhrApplianceList.setRequestHeader("Authorization", "Bearer " + localStorage.getItem("access_key"));
-	
-	xhrApplianceList.send();
 }
 
 function fetchSignatures() {
