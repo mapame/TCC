@@ -166,6 +166,7 @@ function fetchEnergyData(disaggregatedEnergy=false) {
 		if(this.status == 200) {
 			let responseObj = JSON.parse(this.responseText);
 			var labels = ["Hora"];
+			var colors = [];
 			var lastTimestamp = null;
 			var currentEntry;
 			
@@ -175,9 +176,11 @@ function fetchEnergyData(disaggregatedEnergy=false) {
 			if(disaggregatedEnergy) {
 				for(const applianceItem of window.smceeApplianceList.values()) {
 					labels.push(applianceItem.name);
+					colors.push(applianceItem.color);
 				}
 				
 				labels.push("Desconhecido");
+				colors.push("#636363");
 				
 				window.smceeEnergyData.data = generateDisaggregatedEnergyFile(window.smceeApplianceList.size, responseObj, startTimestamp, endTimestamp);
 			} else {
@@ -189,6 +192,7 @@ function fetchEnergyData(disaggregatedEnergy=false) {
 			window.smceeEnergyChart.updateOptions({
 				'stackedGraph' : disaggregatedEnergy && document.getElementById("stacked-checkbox").checked,
 				'labels' : labels,
+				'colors': (disaggregatedEnergy ? colors : null),
 				'file' : window.smceeEnergyData.data
 			});
 			
