@@ -8,9 +8,10 @@ window.onload = function() {
 function initPage() {
 	userInfoFetch(function() {navbarPopulateItems("main-menu");});
 	
+	document.getElementById("event-type-select").value = "all";
+	
 	document.getElementById("chart-type-select").onchange = updateSignatureChart;
 	document.getElementById("event-type-select").onchange = updateSignatureChart;
-	document.getElementById("appliance-select").onchange = updateSignatureChart;
 	
 	window.smceeSignatureScatterChart = new Chart(document.getElementById("signature-chart-canvas"), {
 		type: "scatter",
@@ -26,20 +27,48 @@ function initPage() {
 			maintainAspectRatio: false,
 			animation: {
 				duration: 0
+			},
+			plugins: {
+				legend: {
+					display: true,
+					onClick: handleLegendClick,
+				}
 			}
 		}
 	});
 	
-	fetchApplianceList(function() { fetchSignatures(); updateApplianceSelect(); });
+	fetchApplianceList(fetchSignatures);
+}
+
+function handleLegendClick(evt, item, legend) {
+	if(typeof window.smceeHighlightedDataset == "string" && item.text === window.smceeHighlightedDataset) {
+		legend.chart.data.datasets.forEach((dataset) => {
+			dataset.backgroundColor = (dataset.backgroundColor.length === 9) ? dataset.backgroundColor.slice(0, -2) : dataset.backgroundColor;
+			dataset.borderWidth = 1;
+		});
+		
+		window.smceeHighlightedDataset = null;
+	} else {
+		legend.chart.data.datasets.forEach((dataset) => {
+			if(dataset.label === item.text) {
+				dataset.backgroundColor = (dataset.backgroundColor.length === 9) ? dataset.backgroundColor.slice(0, -2) : dataset.backgroundColor;
+			} else {
+				dataset.backgroundColor = dataset.backgroundColor + ((dataset.backgroundColor.length === 9) ? '' : '10');
+			}
+			dataset.borderWidth = 0;
+		});
+		
+		window.smceeHighlightedDataset = item.text;
+	}
+	
+	legend.chart.update();
 }
 
 function updateSignatureChart() {
 	var chartType = document.getElementById("chart-type-select").value;
 	var eventType = document.getElementById("event-type-select").value;
-	var applianceId = Number(document.getElementById("appliance-select").value);
-	var activeData = [];
-	var inactiveData = [];
-	var selectedData = [];
+	var applianceSignatures = new Map();
+	var inactiveAppliancesData = [];
 	
 	if(chartType === "pxpk") {
 		document.getElementById("event-type-select").disabled = true;
@@ -51,7 +80,7 @@ function updateSignatureChart() {
 	if(typeof window.smceeApplianceList != "object" || typeof window.smceeSignatures != "object")
 		return;
 	
-	window.smceeSignatureScatterChart.datasets = [];
+	window.smceeSignatureScatterChart.data.datasets = [];
 	
 	for(signatureItem of window.smceeSignatures) {
 		let value;
@@ -70,54 +99,31 @@ function updateSignatureChart() {
 		else if(chartType === "p1xp2")
 			value = {x: signatureItem.delta_p[0], y: signatureItem.delta_p[1]};
 		
-		if(signatureItem.appliance_id === applianceId)
-			selectedData.push(value);
-		else if(window.smceeApplianceList.get(signatureItem.appliance_id).is_active)
-			activeData.push(value);
-		else
-			inactiveData.push(value);
+		if(!window.smceeApplianceList.get(signatureItem.appliance_id).is_active) {
+			inactiveAppliancesData.push(value);
+		} else {
+			if(!applianceSignatures.has(signatureItem.appliance_id))
+				applianceSignatures.set(signatureItem.appliance_id, new Array())
+			
+			applianceSignatures.get(signatureItem.appliance_id).push(value);
+		}
 	}
 	
-	window.smceeSignatureScatterChart.data.datasets = [{
-			label: "Aparelhos ativos",
-			backgroundColor: 'rgba(100, 100, 255)',
-			data: activeData
-		}];
-	
-	if(inactiveData.length > 0)
+	for(const applianceId of applianceSignatures.keys())
 		window.smceeSignatureScatterChart.data.datasets.push({
-			label: "Aparelhos inativos",
-			backgroundColor: 'rgba(200, 200, 200)',
-			data: inactiveData
+			label: window.smceeApplianceList.get(applianceId).name,
+			backgroundColor: window.smceeApplianceList.get(applianceId).color,
+			data: applianceSignatures.get(applianceId)
 		});
 	
-	if(applianceId > 0)
+	if(inactiveAppliancesData.length > 0)
 		window.smceeSignatureScatterChart.data.datasets.push({
-			label: "Aparelho selecionado",
-			backgroundColor: 'rgba(255, 100, 100)',
-			data: selectedData
+			label: "Aparelhos inativos",
+			backgroundColor: "#a3a3a3",
+			data: inactiveAppliancesData
 		});
 	
 	window.smceeSignatureScatterChart.update();
-}
-
-function updateApplianceSelect() {
-	var applianceSelectElement = document.getElementById("appliance-select");
-	var selectOptionElement;
-	
-	if(typeof window.smceeApplianceList != "object" || applianceSelectElement === null)
-		return;
-	
-	while(applianceSelectElement.childElementCount > 1)
-		applianceSelectElement.removeChild(applianceSelectElement.lastChild);
-	
-	for(applianceItem of window.smceeApplianceList.values()) {
-		selectOptionElement = document.createElement("option");
-		selectOptionElement.innerText = applianceItem.name + (applianceItem.is_active ? "" : " (inativo)");
-		selectOptionElement.value = applianceItem.id;
-		
-		applianceSelectElement.appendChild(selectOptionElement);
-	}
 }
 
 function fetchSignatures() {
