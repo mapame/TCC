@@ -68,7 +68,7 @@ function updateChart() {
 		window.smceeEnergyChart.resetZoom();
 	} else {
 		if(disaggregatedEnergyMode) {
-			window.smceeEnergyChart.setVisibility(new Array(window.smceeApplianceList.size + 1).fill(true));
+			window.smceeEnergyChart.setVisibility(new Array(window.smceeEnergyChart.numColumns() - 1).fill(true));
 			
 			window.smceeEnergyChart.updateOptions({
 				'stackedGraph' : document.getElementById("stacked-checkbox").checked
@@ -102,40 +102,40 @@ function generateEnergyFile(energyData, startTimestamp, endTimestamp) {
 	return fileData;
 }
 
-function generateDisaggregatedEnergyFile(applianceQty, energyData, startTimestamp, endTimestamp) {
+function generateDisaggregatedEnergyFile(energyData, applianceIdSet, startTimestamp, endTimestamp) {
 	var lastTimestamp = null;
 	var fileData = [];
 	var energyEntry;
 	var disaggregatedEnergySum;
 	var excessPowerCounter = 0;
 	
-	fileData.push([new Date((startTimestamp - 1) * 1000)].concat(new Array(applianceQty + 1).fill(null)));
+	fileData.push([new Date((startTimestamp - 1) * 1000)].concat(new Array(applianceIdSet.size + 1).fill(null)));
 	
 	for(const element of energyData) {
 		if(lastTimestamp !== null && element.timestamp - lastTimestamp > 60)
-			fileData.push([new Date((element.timestamp - 1) * 1000)].concat(new Array(applianceQty + 1).fill(null)));
+			fileData.push([new Date((element.timestamp - 1) * 1000)].concat(new Array(applianceIdSet.size + 1).fill(null)));
 		
 		disaggregatedEnergySum = element.standby_energy;
 		
-		energyEntry = new Array(applianceQty + 2).fill(0);
+		energyEntry = new Array();
 		
-		energyEntry[0] = new Date(element.timestamp * 1000);
+		energyEntry.push(new Date(element.timestamp * 1000));
 		
-		for(let applianceId = 1; applianceId < (applianceQty + 2); applianceId++) {
-			if(typeof element.appliance_energy[applianceId - 1] == "undefined")
-				break;
-			
-			energyEntry[applianceId] = element.appliance_energy[applianceId - 1] * 1000;
-			
-			disaggregatedEnergySum += element.appliance_energy[applianceId - 1];
+		for(const applianceId of applianceIdSet.values()) {
+			if(typeof element.appliance_energy[applianceId - 1] == "undefined") {
+				energyEntry.push(0);
+			} else {
+				energyEntry.push(element.appliance_energy[applianceId - 1] * 1000);
+				disaggregatedEnergySum += element.appliance_energy[applianceId - 1];
+			}
 		}
 		
-		energyEntry[applianceQty + 1] = (element.total_energy - disaggregatedEnergySum) * 1000;
-		
-		if(energyEntry[applianceQty + 1] < 0) {
-			energyEntry[applianceQty + 1] = 0;
+		if(element.total_energy < disaggregatedEnergySum) {
+			energyEntry.push(0);
 			
 			excessPowerCounter++;
+		} else {
+			energyEntry.push((element.total_energy - disaggregatedEnergySum) * 1000);
 		}
 		
 		fileData.push(energyEntry);
@@ -146,9 +146,20 @@ function generateDisaggregatedEnergyFile(applianceQty, energyData, startTimestam
 	if(excessPowerCounter > 0)
 		console.warn(excessPowerCounter + " minutos com potência excedente.");
 	
-	fileData.push([new Date((endTimestamp + 1) * 1000)].concat(new Array(applianceQty + 1).fill(null)));
+	fileData.push([new Date((endTimestamp + 1) * 1000)].concat(new Array(applianceIdSet.size + 1).fill(null)));
 	
 	return fileData;
+}
+
+function findAppliancesInEnergy(energyData) {
+	var applianceIdSet = new Set();
+	
+	for(const element of energyData)
+		for(let applianceId = 1; applianceId <= element.appliance_energy.length; applianceId++)
+			if(typeof element.appliance_energy[applianceId - 1] == "number" && element.appliance_energy[applianceId - 1] > 0)
+				applianceIdSet.add(applianceId);
+	
+	return applianceIdSet;
 }
 
 function fetchEnergyData(disaggregatedEnergy=false) {
@@ -174,15 +185,21 @@ function fetchEnergyData(disaggregatedEnergy=false) {
 			window.smceeEnergyData.disaggregated = disaggregatedEnergy;
 			
 			if(disaggregatedEnergy) {
-				for(const applianceItem of window.smceeApplianceList.values()) {
-					labels.push(applianceItem.name);
-					colors.push(applianceItem.color);
+				var applianceIdSet;
+				
+				applianceIdSet = findAppliancesInEnergy(responseObj);
+				
+				for(const applianceId of applianceIdSet.values()) {
+					const appliance = window.smceeApplianceList.get(applianceId);
+					
+					labels.push(appliance.name);
+					colors.push(appliance.color);
 				}
 				
 				labels.push("Desconhecido");
 				colors.push("#636363");
 				
-				window.smceeEnergyData.data = generateDisaggregatedEnergyFile(window.smceeApplianceList.size, responseObj, startTimestamp, endTimestamp);
+				window.smceeEnergyData.data = generateDisaggregatedEnergyFile(responseObj, applianceIdSet, startTimestamp, endTimestamp);
 			} else {
 				labels.push("Energia", "Energia Reativa");
 				
@@ -197,7 +214,7 @@ function fetchEnergyData(disaggregatedEnergy=false) {
 			});
 			
 			if(disaggregatedEnergy)
-				window.smceeEnergyChart.setVisibility(new Array(window.smceeApplianceList.size + 1).fill(true));
+				window.smceeEnergyChart.setVisibility(new Array(window.smceeEnergyChart.numColumns() - 1).fill(true));
 			else
 				window.smceeEnergyChart.setVisibility([true, document.getElementById("reactive-checkbox").checked]);
 			
