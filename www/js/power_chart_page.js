@@ -4,102 +4,112 @@ window.onload = function () {
 	
 	document.getElementById("checkbox-display-events").checked = false;
 	
-	document.getElementById("button-show-voltage-container").onclick = showVoltageChart;
-	document.getElementById("checkbox-display-events").onchange = changeDisplayEvents;
+	document.getElementById("checkbox-separate-phases").onchange = updateChart;
+	document.getElementById("checkbox-display-voltage").onchange = updateChart;
+	document.getElementById("checkbox-display-events").onchange = toggleDisplayEvents;
 	
 	window.smceeHighlightedEvents = new Set();
 	
-	window.smceePowerChart = new Dygraph(document.getElementById("power-chart"), [[0, null]], {
-		labels: ["Hora", "Potência"],
+	window.smceePowerChart = new Dygraph(document.getElementById("power-chart"), [[0, null, null, null, null, null]], {
+		labels: ["Hora", "Potência", "Potência A", "Potência B", "Tensão A", "Tensão B"],
+		colors: ["#172769", "#193CC8", "#1E6EAC", "#AC581E", "#AC281E"],
 		xValueParser: function(x) {return x;},
 		drawPoints: false,
 		legend: "always",
-		includeZero: true,
+		series: {
+			"Tensão A": {
+				axis: "y2"
+			},
+			"Tensão B": {
+				axis: "y2"
+			}
+		},
 		axes: {
 			y: {
+				includeZero: true,
+				gridLineColor: "#6797D4",
 				axisLabelFormatter: function(x) { return x + " W"; }
+			},
+			y2: {
+				drawAxis: true,
+				independentTicks: true,
+				drawGrid: true,
+				gridLineColor: "#D36A4E",
+				axisLabelFormatter: function(x) { return x.toFixed(1) + " V"; },
 			}
 		},
 		annotationClickHandler: annotationClickHandler
-	});
-	
-	window.smceeVoltageChart = new Dygraph(document.getElementById("voltage-chart"), [[0, null, null]], {
-		labels: ["Hora", "Fase A", "Fase B"],
-		xValueParser: function(x) {return x;},
-		drawPoints: false,
-		legend: "always",
-		valueRange: [(127 * 0.75), (127 * 1.25)],
-		axes: {
-			y: {
-				axisLabelFormatter: function(x) { return x + " V"; }
-			}
-		}
-	});
-	
-	Dygraph.synchronize([window.smceePowerChart, window.smceeVoltageChart], {
-		zoom: true,
-		selection: true,
-		range: false
 	});
 }
 
 function initPage() {
 	userInfoFetch(function() {navbarPopulateItems("main-menu");});
 	
-	fetchApplianceList(enableEventCheckbox);
-	fetchPowerData(12 * 3600);
+	fetchPVData(12 * 3600);
 }
 
-function showVoltageChart() {
-	document.getElementById("button-show-voltage-container").classList.add("is-loading");
-	
-	fetchVoltageData();
-}
-
-function changeDisplayEvents() {
+function toggleDisplayEvents() {
 	if(this.checked)
 		updateAnnotations();
 	else
 		window.smceePowerChart.setAnnotations([]);
 }
 
-function enableEventCheckbox() {
-	if(typeof window.smceeLoadEvents == "object" && typeof window.smceeApplianceList == "object")
-		document.getElementById("checkbox-display-events").disabled = false;
+function updateChart() {
+	var separatePhases = document.getElementById("checkbox-separate-phases").checked;
+	var displayVoltage = document.getElementById("checkbox-display-voltage").checked;
+	
+	if(separatePhases) {
+		document.getElementById("checkbox-display-events").checked = false;
+		window.smceePowerChart.setAnnotations([]);
+	}
+	
+	document.getElementById("checkbox-display-events").disabled = separatePhases;
+	
+	window.smceePowerChart.setVisibility([!separatePhases, separatePhases, separatePhases, displayVoltage, displayVoltage]);
 }
 
-function fetchPowerData(secondQty) {
+function fetchPVData(secondQty) {
 	var xhrFetchData = new XMLHttpRequest();
 	
 	xhrFetchData.onload = function() {
 		if(this.status === 200) {
 			var responseObject = JSON.parse(this.responseText);
+			var startTimestamp, endTimestamp;
+			var chartDataFile = [];
 			var lastTimestamp = null;
 			
-			window.smceePowerData = [];
+			window.smceePVData = responseObject;
 			
-			if(responseObject.length < 1)
-				return;
+			startTimestamp = responseObject[0][0];
+			endTimestamp = responseObject[responseObject.length - 1][0];
 			
-			window.smceeDataStartTimestamp = responseObject[0][0];
-			window.smceeDataEndTimestamp = responseObject[responseObject.length - 1][0];
+			fetchPowerEvents(startTimestamp, endTimestamp);
 			
-			window.smceePowerData.push([new Date((smceeDataEndTimestamp - secondQty - 1) * 1000), null]);
+			startTimestamp = window.smceePVData[0][0];
+			endTimestamp = window.smceePVData[window.smceePVData.length - 1][0];
 			
-			for(let pdItem of responseObject) {
+			chartDataFile.push([new Date((endTimestamp - secondQty - 1) * 1000), null, null, null, null, null]);
+			
+			for(let pdItem of window.smceePVData) {
 				if(lastTimestamp !== null && pdItem[0] - lastTimestamp > 1)
-					window.smceePowerData.push([new Date((lastTimestamp + 1) * 1000), null]);
+					chartDataFile.push([new Date((lastTimestamp + 1) * 1000), null, null, null, null, null]);
 				
-				window.smceePowerData.push([new Date(pdItem[0] * 1000), pdItem[1]]);
+				chartDataFile.push([new Date(pdItem[0] * 1000), (pdItem[1] + pdItem[2]), pdItem[1], pdItem[2], pdItem[3], pdItem[4]]);
 				
 				lastTimestamp = pdItem[0];
 			}
 			
-			window.smceePowerData.push([new Date((lastTimestamp + 1) * 1000), null]);
+			chartDataFile.push([new Date((lastTimestamp + 1) * 1000), null, null, null, null, null]);
 			
-			window.smceePowerChart.updateOptions({'file' : window.smceePowerData});
+			window.smceePowerChart.updateOptions({
+				'file': chartDataFile,
+			});
 			
-			fetchPowerEvents(secondQty);
+			updateChart();
+			
+			document.getElementById("checkbox-separate-phases").disabled = false;
+			document.getElementById("checkbox-display-voltage").disabled = false;
 			
 		} else if(this.status === 401) {
 			redirectToLogin();
@@ -108,7 +118,7 @@ function fetchPowerData(secondQty) {
 		}
 	}
 	
-	xhrFetchData.open("GET", window.smceeApiUrlBase + "power?type=pt&last=" + secondQty);
+	xhrFetchData.open("GET", window.smceeApiUrlBase + "power?type=pv&last=" + secondQty);
 	
 	xhrFetchData.timeout = 2000;
 	
@@ -117,55 +127,7 @@ function fetchPowerData(secondQty) {
 	xhrFetchData.send();
 }
 
-function fetchVoltageData() {
-	var xhrFetchData = new XMLHttpRequest();
-	
-	xhrFetchData.onload = function() {
-		if(this.status === 200) {
-			var responseObject = JSON.parse(this.responseText);
-			var lastTimestamp = null;
-			
-			window.smceeVoltageData = [];
-			
-			if(responseObject.length < 1)
-				return;
-			
-			document.getElementById("button-show-voltage-container").parentNode.classList.add("is-hidden");
-			document.getElementById("voltage-chart-container").classList.remove("is-hidden");
-			
-			window.smceeVoltageData.push([new Date((window.smceeDataEndTimestamp - 1) * 1000), null, null]);
-			
-			for(let pdItem of responseObject) {
-				if(lastTimestamp !== null && pdItem[0] - lastTimestamp > 1)
-					window.smceeVoltageData.push([new Date((lastTimestamp + 1) * 1000), null, null]);
-				
-				window.smceeVoltageData.push([new Date(pdItem[0] * 1000), pdItem[2], pdItem[3]]);
-				
-				lastTimestamp = pdItem[0];
-			}
-			
-			window.smceeVoltageData.push([new Date((lastTimestamp + 1) * 1000), null, null]);
-			
-			window.smceeVoltageChart.updateOptions({'file' : window.smceeVoltageData});
-			window.smceeVoltageChart.resize();
-			
-		} else if(this.status === 401) {
-			redirectToLogin();
-		} else {
-			console.error("Failed to fetch power data. Status: " + this.status);
-		}
-	}
-	
-	xhrFetchData.open("GET", window.smceeApiUrlBase + "power?type=ptv&start=" + window.smceeDataStartTimestamp + "&end=" + window.smceeDataEndTimestamp);
-	
-	xhrFetchData.timeout = 2000;
-	
-	xhrFetchData.setRequestHeader("Authorization", "Bearer " + localStorage.getItem("access_key"));
-	
-	xhrFetchData.send();
-}
-
-function fetchPowerEvents(secondQty) {
+function fetchPowerEvents(startTimestamp, endTimestamp) {
 	var xhrPowerEvents = new XMLHttpRequest();
 	
 	xhrPowerEvents.onload = function() {
@@ -179,9 +141,8 @@ function fetchPowerEvents(secondQty) {
 			for(eventItem of responseObject)
 				window.smceeLoadEvents.set(eventItem.timestamp, eventItem);
 			
-			enableEventCheckbox();
+			fetchApplianceList(function() { document.getElementById("checkbox-display-events").disabled = false; });
 			
-			document.getElementById("button-show-voltage-container").classList.remove("is-loading");
 		} else if(this.status === 401) {
 			redirectToLogin();
 		} else {
@@ -189,7 +150,7 @@ function fetchPowerEvents(secondQty) {
 		}
 	}
 	
-	xhrPowerEvents.open("GET", window.smceeApiUrlBase + "power/events?last=" + secondQty);
+	xhrPowerEvents.open("GET", window.smceeApiUrlBase + "power/events?start=" + startTimestamp + "&end=" + endTimestamp);
 	
 	xhrPowerEvents.timeout = 2000;
 	

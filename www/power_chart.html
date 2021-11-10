@@ -11,7 +11,6 @@
 	<link rel="stylesheet" href="css/dygraph.css">
 	
 	<script src="js/dygraph.min.js"></script>
-	<script src="js/dygraph_synchronizer.js"></script>
 	
 	<script src="js/global_defs.js"></script>
 	<script src="js/auth.js"></script>
@@ -21,7 +20,7 @@
 	
 	<script src="js/power_chart_page.js"></script>
 	
-	<title>SMCEE - Gráficos de Potência e Tensão</title>
+	<title>SMCEE - Gráfico de Potência e Tensão</title>
 </head>
 <body>
 	<nav class="navbar is-dark" role="navigation" aria-label="main navigation">
@@ -36,12 +35,20 @@
 	</nav>
 	<div class="section">
 		<div class="container is-max-desktop">
-			<p class="title is-4">Potência</p>
 			<div style="width: 100%;" class="mt-4" id="power-chart"></div>
 			<div class="level mt-4">
 				<div class="level-left">
 					<div class="level-item">
-						<button class="button is-primary is-small is-loading" id="button-show-voltage-container">Mostrar gráfico de tensão</button>
+						<label class="checkbox">
+							<input type="checkbox" id="checkbox-separate-phases" autocomplete="off" disabled>
+							Separar fases
+						</label>
+					</div>
+					<div class="level-item">
+						<label class="checkbox">
+							<input type="checkbox" id="checkbox-display-voltage" autocomplete="off" disabled>
+							Mostrar tensão
+						</label>
 					</div>
 				</div>
 				<div class="level-right">
@@ -53,10 +60,6 @@
 					</div>
 				</div>
 			</div>
-		</div>
-		<div class="container is-max-desktop mt-4 is-hidden" id="voltage-chart-container">
-			<p class="title is-4">Tensão</p>
-			<div style="width: 100%;" class="mt-4" id="voltage-chart"></div>
 		</div>
 	</div>
 </body>
