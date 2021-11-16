@@ -1,0 +1,91 @@
+<!doctype html>
+<html>
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+	
+	<link rel="icon" href="favicon.png">
+	
+	<link href="css/materialdesignicons.min.css" media="all" rel="stylesheet" type="text/css">
+	<link rel="stylesheet" href="css/bulma.min.css">
+	
+	<script src="js/chart.min.js"></script>
+	
+	<script src="js/global_defs.js"></script>
+	<script src="js/auth.js"></script>
+	<script src="js/user_info.js"></script>
+	<script src="js/navbar.js"></script>
+	<script src="js/appliances.js"></script>
+	
+	<script src="js/consumption_page.js"></script>
+	
+	<title>SMCEE - Calcular consumo</title>
+</head>
+<body>
+	<nav class="navbar is-dark" role="navigation" aria-label="main navigation">
+		<div class="navbar-brand">
+			<a class="navbar-item" href="./">
+				<img src="img/logo.png">
+			</a>
+			<a role="button" class="navbar-burger" data-target="main-menu"></a>
+		</div>
+		<div id="main-menu" class="navbar-menu">
+		</div>
+	</nav>
+	<div class="section">
+		<div class="container is-max-desktop">
+			<div class="level mb-6">
+				<div class="level-left">
+					<div class="level-item">
+						<p class="control has-icons-left">
+							<input class="input" id="input-date-start" type="datetime-local">
+							<span class="icon is-small is-left"><i class="mdi mdi-18px mdi-calendar-start"></i></span>
+						</p>
+					</div>
+					<div class="level-item">
+						<p class="control has-icons-left">
+						<input class="input" id="input-date-end" type="datetime-local">
+							<span class="icon is-small is-left"><i class="mdi mdi-18px mdi-calendar-end"></i></span>
+						</p>
+					</div>
+					<div class="level-item">
+						<button class="button is-primary is-fullwidth is-loading" id="button-submit"><span class="icon"><i class="mdi mdi-18px mdi-calendar-check"></i></span></button>
+					</div>
+				</div>
+			</div>
+			<div class="notification is-warning is-hidden" id="low-coverage-warning">Os dados não cobrem completamente o período solicitado. (<span id="coverage-percentage"></span>% de cobertura)</div>
+			<div class="columns">
+				<div class="column has-text-centered">
+					<p class="is-size-6">Consumo Total</p>
+					<p class="is-size-4 has-text-weight-bold"><span id="consumption-total-energy">---.--</span> kWh</p>
+					<p class="is-size-4">R$ <span id="consumption-total-cost">---.--</span></p>
+				</div>
+				<div class="column has-text-centered">
+					<p class="is-size-6">Desconhecido</p>
+					<p class="is-size-4 has-text-weight-bold"><span id="consumption-unknown-energy">---.--</span> kWh</p>
+					<p class="is-size-4">R$ <span id="consumption-unknown-cost">---.--</span></p>
+				</div>
+				<div class="column has-text-centered">
+					<p class="is-size-6">Stand-By</p>
+					<p class="is-size-4 has-text-weight-bold"><span id="consumption-standby-energy">--.--</span> kWh</p>
+					<p class="is-size-4">R$ <span id="consumption-standby-cost">--.--</span></p>
+				</div>
+			</div>
+			<div class="columns is-vcentered mt-3 is-hidden" id="appliance-chart-table">
+				<div class="column is-two-fifths">
+					<div class="" style="width: 100%; position: relative;"><canvas id="appliance-chart-canvas"></canvas></div>
+				</div>
+				<div class="column">
+					<div class="table-container">
+						<table class="table is-striped is-fullwidth is-bordered">
+							<tbody id="appliances-tbody">
+							</tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</body>
+</html>
+

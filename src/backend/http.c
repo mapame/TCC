@@ -167,6 +167,10 @@ static const path_segment_t url_path_tree = {
 					.text = "months",
 					.get_handler = http_handler_get_energy_months,
 				},
+				{
+					.text = "consumption",
+					.get_handler = http_handler_get_consumption,
+				},
 				{}
 			}
 		},{

@@ -1,6 +1,7 @@
 window.smceeApiUrlBase = window.location.protocol + "//" + window.location.hostname + ((window.location.port === "") ? "/api/" : ":8081/");
 
 window.smceeNavbarMenuItems = [
+	{name: "Consumo", href: "consumption.html"},
 	{name: "Gráficos", dropdown: [
 		{name: "Potência e Tensão", href: "power_chart.html"},
 		{name: "Energia", href: "energy_chart.html"},
