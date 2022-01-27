@@ -427,10 +427,9 @@ static int calc_base_pair_score(int appliance_id, const load_event_t *load_event
 	if((load_event_off->timestamp - load_event_on->timestamp) > (18*3600))
 		score -= 5000;
 	
-	score -= load_event_off->time_gap * 500;
-	score -= load_event_on->time_gap * 500;
+	score -= (load_event_off->time_gap + load_event_on->time_gap) * 500;
 	
-	score -= 20000 * (fabs(load_event_on->delta_pt + load_event_off->delta_pt)/load_event_on->delta_pt) / ((load_event_on->peak_pt > load_event_off->peak_pt) ? (load_event_on->peak_pt / load_event_on->delta_pt) : 1);
+	score -= 20000 * (fabs(load_event_on->delta_pt + load_event_off->delta_pt)/load_event_on->delta_pt) / (load_event_on->peak_pt / load_event_on->delta_pt));
 	
 	for(i = 0; i < 3; i++)
 		for(j = 0; j < 3; j++)
@@ -445,7 +444,7 @@ static int calc_base_pair_score(int appliance_id, const load_event_t *load_event
 }
 
 static int pair_load_events() {
-	time_t timestamp_last_power = power_get_last_timestamp();;
+	time_t timestamp_last_power = power_get_last_timestamp();
 	int count_off, pos_off;
 	int count_on, pos_on;
 	load_event_t *load_event_off = NULL;
