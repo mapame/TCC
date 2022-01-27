@@ -206,6 +206,7 @@ int main(int argc, char **argv) {
 		printf("\t set_rtc\n");
 		printf("\t fw_update filename\n");
 		printf("\t status\n");
+		printf("\t status_adv\n");
 		printf("\t get_data type quantity\n");
 		return -1;
 	}
