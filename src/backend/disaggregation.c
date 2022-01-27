@@ -429,7 +429,7 @@ static int calc_base_pair_score(int appliance_id, const load_event_t *load_event
 	
 	score -= (load_event_off->time_gap + load_event_on->time_gap) * 500;
 	
-	score -= 20000 * (fabs(load_event_on->delta_pt + load_event_off->delta_pt)/load_event_on->delta_pt) / (load_event_on->peak_pt / load_event_on->delta_pt));
+	score -= 20000 * ((fabs(load_event_on->delta_pt + load_event_off->delta_pt)/load_event_on->delta_pt) / (load_event_on->peak_pt / load_event_on->delta_pt));
 	
 	for(i = 0; i < 3; i++)
 		for(j = 0; j < 3; j++)
